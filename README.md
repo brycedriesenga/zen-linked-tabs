@@ -1,13 +1,13 @@
-# Linked Tabs for Zen — v0.5.1 prototype
+# Linked Tabs for Zen — v0.5.2 prototype
 
 Keep a list, search result, or overview open in one split pane. Click its links to load them in the other pane, using Zen’s existing split tabs.
 
-**Status:** 31 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. The user confirmed core routing works in v0.3. v0.5.1 centers a subtle direction arrow on the split group's shared boundary and preserves Zen's inactive divider. These latest visual changes have **not been verified in a live Zen session** yet.
+**Status:** 31 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. The user confirmed core routing works in v0.3. v0.5.2 replaces the inactive linked split's divider with a narrow directional chevron using Zen's original divider color and 1px stroke. Active splits keep the centered arrow. These latest visual changes have **not been verified in a live Zen session** yet.
 
 ## Update an existing Sine installation
 
 1. Open Zen Settings → Sine Mods (`about:preferences#sineMods`).
-2. Check for mod updates and update **Linked Tabs** to **0.5.1**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
+2. Check for mod updates and update **Linked Tabs** to **0.5.2**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
 3. Confirm Sine’s **Enable installing JS from unofficial sources** setting is on and the individual Linked Tabs toggle is enabled.
 4. Fully quit and reopen Zen. If the version still appears stale, use `about:support` → **Clear startup cache…**.
 5. In an existing two-tab split, hover at the top center of either pane. Look for the **Linked Tabs** icon **between the drag handle and unsplit button**.
@@ -30,7 +30,7 @@ This repository is a Sine JavaScript mod, not an XPI. Source ZIPs cannot be inst
 4. Click a regular link in the source. Its URL loads in the existing **destination** tab, while the source stays put. Links with `target="_blank"` also reuse the destination.
 5. **Right-click the icon** for the options menu: **Reverse link direction**, **Use this pane as the source** when appropriate, and **Unlink tabs**. For keyboard menu access, focus the button and press Down Arrow, Shift+F10, or the Context Menu key. The source-tab context menu and toggle shortcut remain available as alternatives.
 
-While linked, one small arrow is centered **between the two tabs in Zen’s sidebar**, pointing from source to destination. Inactive splits retain Zen’s thin divider with a subtle arrow over its center. Active splits retain their native tab highlights and show the arrow alone at the same position. The arrow reads `→` or `←` in the expanded sidebar, and `↓` or `↑` when Zen stacks the tabs in a collapsed sidebar. It follows sidebar order and uses inherited text color. Reversing the link reverses the arrow. Unlinking removes the arrow and leaves Zen’s native divider behavior. No extra markers are inserted beside favicons or audio controls.
+While linked, a direction indicator is centered **between the two tabs in Zen’s sidebar**, pointing from source to destination. Inactive splits replace the thin divider with a narrow `〈` or `〉` shaped chevron, using the original divider’s light/dark color and 1px stroke. Active splits retain their native tab highlights and show a small `→` or `←` arrow alone at the same position, using inherited text color. In a collapsed sidebar, the indicator points down or up between the stacked tabs. Reversing the link reverses the indicator. Unlinking restores Zen’s native divider. No extra markers are inserted beside favicons or audio controls.
 
 The hover-panel icon is 12 px and changes from a **broken chain** when unlinked to a **connected chain** when paired, with no persistent outline or shaded background. Its tooltip explains left-click and right-click actions. The link buttons are **not shown for splits with more than two panes**. Adding a third pane clears any existing pair; returning to two panes restores the buttons so you can link again.
 
@@ -87,7 +87,7 @@ Tests execute the actual entry point, policy, controller, runtime, and actor mod
 
 ## Troubleshooting / remove
 
-- **No hover-panel button:** make sure the split has exactly two panes, check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.5.1, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console. No address-bar button is expected in this version.
+- **No hover-panel button:** make sure the split has exactly two panes, check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.5.2, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console. No address-bar button is expected in this version.
 - **Button appears but Link is disabled:** create an active split of exactly two tabs in the same container.
 - **Button appears but links do nothing:** test the fixture’s normal link first, then check the Browser Console. A JS-only navigation button or iframe link is intentionally outside this version’s scope.
 - **After updating:** fully quit and reopen Zen; imported privileged modules can remain cached until restart.

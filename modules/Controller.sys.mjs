@@ -279,7 +279,7 @@ export class LinkedTabsController {
     this.syncSplitDividers();
     this.syncPaneControls();
     this.win.ZenLinkedTabsStatus = {
-      version: "0.5.1", phase: this.routingError ? "error" : "ready",
+      version: "0.5.2", phase: this.routingError ? "error" : "ready",
       paneControls: this.paneControls.size, pairs: this.pairs.length,
       directionDividers: this.dividerTabs.size,
       navigation: { ...this.navigation },
@@ -302,6 +302,6 @@ export class LinkedTabsController {
     this.pairs = [];
     detach(this);
     if (this.win.ZenLinkedTabs === this) delete this.win.ZenLinkedTabs;
-    this.win.ZenLinkedTabsStatus = { version: "0.5.1", phase: "disabled" };
+    this.win.ZenLinkedTabsStatus = { version: "0.5.2", phase: "disabled" };
   }
 }

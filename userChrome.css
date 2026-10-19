@@ -21,13 +21,14 @@
   opacity: 1;
   pointer-events: auto;
 }
-/* One passive arrow at the split group's midpoint. Keep Zen's tab ::after
-   separator unchanged so its native inactive/active visibility still applies. */
+/* Keep both indicators centered on the shared boundary. Active splits use
+   an arrow; inactive splits use a narrow chevron in place of Zen's line. */
 tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider]) {
   position: relative;
 }
 tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider])::before {
   content: "→";
+  --zen-linked-tabs-chevron-angle: 0deg;
   display: block;
   position: absolute;
   left: 50%;
@@ -50,12 +51,15 @@ tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linke
 }
 tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider="reverse"])::before {
   content: "←";
+  --zen-linked-tabs-chevron-angle: 180deg;
 }
 tab-group[split-view-group] .tab-group-container:dir(rtl):has(> .tabbrowser-tab[zen-linked-tabs-divider])::before {
   content: "←";
+  --zen-linked-tabs-chevron-angle: 180deg;
 }
 tab-group[split-view-group] .tab-group-container:dir(rtl):has(> .tabbrowser-tab[zen-linked-tabs-divider="reverse"])::before {
   content: "→";
+  --zen-linked-tabs-chevron-angle: 0deg;
 }
 /* Symmetric room at the shared boundary keeps the arrow clear of both titles
    and the second favicon. The native tab backgrounds retain their geometry. */
@@ -74,7 +78,25 @@ tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linke
 /* The group stacks its two tabs vertically when the sidebar is collapsed. */
 :root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider])::before {
   content: "↓";
+  --zen-linked-tabs-chevron-angle: 90deg;
 }
 :root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider="reverse"])::before {
   content: "↑";
+  --zen-linked-tabs-chevron-angle: -90deg;
+}
+/* Replace only linked splits' native separator. Unlinked splits keep Zen's
+   original divider, and active linked splits keep the arrow above. */
+tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider]::after {
+  display: none !important;
+}
+/* A geometric 1px stroke avoids font-dependent bracket weight. Use the same
+   16px span and light/dark paint as Zen's original inactive separator. */
+tab-group[split-view-group]:not([hasactivetab]) > .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider]):not(:has(> .tabbrowser-tab:is([multiselected], [visuallyselected])))::before {
+  content: "";
+  width: 6px;
+  height: 16px;
+  background-color: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.2));
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 16'%3E%3Cpath d='M1 .5 5 8 1 15.5' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  transform: translate(-50%, -50%) rotate(var(--zen-linked-tabs-chevron-angle));
+  opacity: 1;
 }
