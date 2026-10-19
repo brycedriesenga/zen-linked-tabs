@@ -10,7 +10,7 @@ export class LinkedTabsController {
     this.pairs = [];
     this.nodes = [];
     this.paneControls = new Map();
-    this.tabIndicators = new Map();
+    this.dividerTabs = new Set();
     this.routingError = null;
     this.navigation = { received: 0, destinationRequests: 0, sourceFallbackRequests: 0, failures: 0, lastOutcome: "none" };
     this.abort = new win.AbortController();
@@ -30,23 +30,9 @@ export class LinkedTabsController {
     const on = (node, type, fn) => node.addEventListener(type, fn, { signal: this.abort.signal });
     this.make = make;
     this.on = on;
-    this.button = make("toolbarbutton", {
-      id: "zen-linked-tabs-button", class: "toolbarbutton-1 chromeclass-toolbar-additional",
-      label: "Linked Tabs", tooltiptext: "Linked Tabs: create a two-tab split first",
-      type: "menu"
-    });
-    this.addButtonIcon(this.button);
-    const toolbar = doc.getElementById("nav-bar-customization-target") || doc.getElementById("nav-bar");
-    // The per-pane header is the primary UI; the global toolbar is optional.
-    toolbar?.appendChild(this.button);
-    const popup = make("menupopup", {}, this.button);
-    this.linkItem = make("menuitem", { label: "Send this pane’s links → other pane" }, popup);
-    this.reverseItem = make("menuitem", { label: "Reverse link direction" }, popup);
-    this.unlinkItem = make("menuitem", { label: "Unlink these tabs" }, popup);
-    on(this.linkItem, "command", () => this.link(win.gBrowser.selectedTab));
-    on(this.reverseItem, "command", () => this.reverse(win.gBrowser.selectedTab));
-    on(this.unlinkItem, "command", () => this.unlink(win.gBrowser.selectedTab));
-    on(popup, "popupshowing", () => this.refresh());
+    // Remove a leftover control from an earlier mod version; do not add a
+    // navigation-toolbar widget. Pane controls and the tab menu are sufficient.
+    doc.getElementById("zen-linked-tabs-button")?.remove();
 
     const tabMenu = doc.getElementById("tabContextMenu");
     if (tabMenu) {
@@ -104,14 +90,15 @@ export class LinkedTabsController {
     const tabs = Array.from(this.win.gBrowser.tabs);
     const headerFor = tab => tab.linkedBrowser?.closest(".browserSidebarContainer")?.querySelector(".zen-view-splitter-header");
     for (const [tab, ui] of this.paneControls) {
-      if (!tabs.includes(tab) || !ui.button.isConnected || ui.button.parentNode !== headerFor(tab)) {
+      if (!tabs.includes(tab) || splitTabsFor(this.win, tab).length !== 2 ||
+          !ui.button.isConnected || ui.button.parentNode !== headerFor(tab)) {
         ui.button.remove();
         this.nodes = this.nodes.filter(node => node !== ui.button);
         this.paneControls.delete(tab);
       }
     }
     for (const tab of tabs) {
-      if (this.paneControls.has(tab)) continue;
+      if (this.paneControls.has(tab) || splitTabsFor(this.win, tab).length !== 2) continue;
       const header = headerFor(tab);
       if (!header) continue;
       const button = this.make("toolbarbutton", {
@@ -220,46 +207,21 @@ export class LinkedTabsController {
     else this.link(tab);
   }
 
-  syncTabIndicators() {
-    const tabs = Array.from(this.win.gBrowser.tabs);
-    for (const [tab, indicator] of this.tabIndicators) {
-      const content = tab.querySelector(".tab-content");
-      if (!tabs.includes(tab) || !tab.hasAttribute("zen-linked-tabs-role") ||
-          !indicator.node.isConnected || indicator.node.parentNode !== content) {
-        indicator.node.remove();
-        this.nodes = this.nodes.filter(node => node !== indicator.node);
-        this.tabIndicators.delete(tab);
-      }
+  syncSplitDividers() {
+    const next = new Set();
+    for (const pair of this.pairs) {
+      const tabs = splitTabsFor(this.win, pair.source);
+      if (tabs.length !== 2) continue;
+      // The native divider is the first sidebar tab's ::after pseudo-element.
+      // Derive direction from sidebar order, not the page split's orientation.
+      const first = tabs[0];
+      first.setAttribute("zen-linked-tabs-divider", first === pair.source ? "forward" : "reverse");
+      next.add(first);
     }
-    for (const tab of tabs) {
-      const role = tab.getAttribute("zen-linked-tabs-role");
-      if (!role) continue;
-      const content = tab.querySelector(".tab-content");
-      const favicon = tab.querySelector(".tab-icon-stack");
-      if (!content || !favicon || favicon.parentNode !== content) continue;
-      let indicator = this.tabIndicators.get(tab);
-      if (!indicator) {
-        const node = this.make("box", { class: "zen-linked-tabs-tab-indicator", role: "img", align: "center" });
-        const svg = this.win.document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        for (const [key, value] of Object.entries({
-          viewBox: "0 0 16 16", width: "12", height: "12", fill: "none",
-          stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round",
-          "stroke-linejoin": "round", "aria-hidden": "true"
-        })) svg.setAttribute(key, value);
-        const path = this.win.document.createElementNS("http://www.w3.org/2000/svg", "path");
-        svg.appendChild(path);
-        node.appendChild(svg);
-        // Separate sibling after the favicon: leave its overlays and audio control intact.
-        content.insertBefore(node, favicon.nextSibling);
-        indicator = { node, path };
-        this.tabIndicators.set(tab, indicator);
-      }
-      const label = role === "source" ? "Linked Tabs source: opens links in the other pane" :
-        "Linked Tabs destination: receives links from the other pane";
-      indicator.node.setAttribute("tooltiptext", label);
-      indicator.node.setAttribute("aria-label", label);
-      indicator.path.setAttribute("d", role === "source" ? "M4 12 12 4 M5 4h7v7" : "M12 4 4 12 M4 5v7h7");
+    for (const tab of this.dividerTabs) {
+      if (!next.has(tab)) tab.removeAttribute("zen-linked-tabs-divider");
     }
+    this.dividerTabs = next;
   }
 
   canLink(tab) {
@@ -314,23 +276,12 @@ export class LinkedTabsController {
       pair.source.setAttribute("zen-linked-tabs-role", "source");
       pair.target.setAttribute("zen-linked-tabs-role", "destination");
     }
-    this.syncTabIndicators();
-    const tab = this.win.gBrowser.selectedTab;
-    const pair = this.pairFor(tab);
-    const role = pair ? (pair.source === tab ? "source" : "destination") : "";
-    this.button.setAttribute("zen-linked-tabs-role", role);
-    this.updateButtonIcon(this.button, !!pair);
-    this.button.setAttribute("tooltiptext", role ?
-      `Linked Tabs: ${role} pane. ${pair.source.label} → ${pair.target.label}` :
-      (this.canLink(tab) ? "Linked Tabs: choose the source pane, then link it" : "Linked Tabs: create a two-tab split first"));
-    this.linkItem.disabled = !this.canLink(tab) || role === "source";
-    this.reverseItem.disabled = !pair;
-    this.unlinkItem.disabled = !pair;
-    if (this.routingError) this.button.setAttribute("tooltiptext", "Linked Tabs could not start — see Browser Console");
+    this.syncSplitDividers();
     this.syncPaneControls();
     this.win.ZenLinkedTabsStatus = {
-      version: "0.4.0", phase: this.routingError ? "error" : "ready",
+      version: "0.5.0", phase: this.routingError ? "error" : "ready",
       paneControls: this.paneControls.size, pairs: this.pairs.length,
+      directionDividers: this.dividerTabs.size,
       navigation: { ...this.navigation },
       ...(this.routingError ? { error: this.routingError } : {})
     };
@@ -346,10 +297,11 @@ export class LinkedTabsController {
     for (const node of this.nodes) node.remove();
     this.nodes = [];
     this.paneControls.clear();
-    this.tabIndicators.clear();
+    for (const tab of this.dividerTabs) tab.removeAttribute("zen-linked-tabs-divider");
+    this.dividerTabs.clear();
     this.pairs = [];
     detach(this);
     if (this.win.ZenLinkedTabs === this) delete this.win.ZenLinkedTabs;
-    this.win.ZenLinkedTabsStatus = { version: "0.4.0", phase: "disabled" };
+    this.win.ZenLinkedTabsStatus = { version: "0.5.0", phase: "disabled" };
   }
 }

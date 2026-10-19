@@ -206,7 +206,7 @@ test("keyboard menu access does not toggle the pair, and nested menu commands do
   c.destroy();
 });
 
-test("direction indicators follow the favicon without replacing favicon overlays or the audio control", async () => {
+test("one divider arrow follows sidebar tab order and reverses without modifying favicon or audio nodes", async () => {
   const env = await harness();
   const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
   const { win, source, target } = browserWindow();
@@ -216,17 +216,62 @@ test("direction indicators follow the favicon without replacing favicon overlays
   const favicon = source.querySelector(".tab-icon-stack");
   const audio = source.querySelector(".tab-audio-button");
   c.link(source);
-  const indicator = c.tabIndicators.get(source);
-  assert.equal(favicon.nextSibling, indicator.node);
-  assert.equal(indicator.node.nextSibling, audio);
+  assert.equal(source.getAttribute("zen-linked-tabs-divider"), "forward");
+  assert.equal(target.hasAttribute("zen-linked-tabs-divider"), false);
+  assert.equal(c.dividerTabs.size, 1);
+  assert.equal(favicon.nextSibling, audio);
   assert.equal(source.querySelector(".tab-icon-stack"), favicon);
-  assert.match(indicator.node.getAttribute("tooltiptext"), /source/);
-  assert.notEqual(indicator.path.getAttribute("d"), c.tabIndicators.get(target).path.getAttribute("d"));
+  c.reverse(source);
+  assert.equal(source.getAttribute("zen-linked-tabs-divider"), "reverse");
+  // Reorder the sidebar tabs: the first tab owns the native divider.
+  source.group.tabs = [target, source];
   c.refresh();
-  assert.equal(content.children.length, 4);
+  assert.equal(source.hasAttribute("zen-linked-tabs-divider"), false);
+  assert.equal(target.getAttribute("zen-linked-tabs-divider"), "forward");
+  assert.equal(content.children.length, 3);
   c.unlink(source);
-  assert.equal(c.tabIndicators.size, 0);
+  assert.equal(c.dividerTabs.size, 0);
+  assert.equal(target.hasAttribute("zen-linked-tabs-divider"), false);
   assert.equal(content.children.length, 3);
   assert.equal(favicon.nextSibling, audio);
+  c.destroy();
+});
+
+test("does not add an address-bar button even when the main toolbar exists", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init();
+  assert.equal(win.document.getElementById("nav-bar-customization-target").children.length, 0);
+  assert.equal(win.document.getElementById("nav-bar").children.length, 0);
+  assert.equal(c.paneControls.size, 2);
+  c.destroy();
+});
+
+test("adding a third pane removes the link controls and arrow; returning to two restores only the controls", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win, source, target } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init(); c.link(source);
+  const oldButton = c.paneControls.get(source).button;
+  const third = browserWindow(30).source;
+  third.group = source.group;
+  source.group.tabs = [source, target, third];
+  win.gBrowser.tabs.push(third);
+  win.gZenViewSplitter.splitViewBrowsers = win.gBrowser.tabs.map(tab => tab.linkedBrowser);
+  c.refresh();
+  assert.equal(c.paneControls.size, 0);
+  assert.equal(oldButton.isConnected, false);
+  assert.equal(c.pairs.length, 0);
+  assert.equal(c.dividerTabs.size, 0);
+  assert.equal(source.hasAttribute("zen-linked-tabs-divider"), false);
+  source.group.tabs = [source, target];
+  win.gBrowser.tabs = [source, target];
+  win.gZenViewSplitter.splitViewBrowsers = win.gBrowser.tabs.map(tab => tab.linkedBrowser);
+  c.refresh();
+  assert.equal(c.paneControls.size, 2);
+  assert.equal(c.pairs.length, 0);
   c.destroy();
 });

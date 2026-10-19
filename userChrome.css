@@ -1,9 +1,3 @@
-#zen-linked-tabs-button .toolbarbutton-icon {
-  width: 16px;
-  height: 16px;
-  -moz-context-properties: fill;
-  fill: currentColor;
-}
 .zen-view-splitter-header .zen-linked-tabs-pane-button {
   min-width: 16px;
   padding: 0;
@@ -12,7 +6,6 @@
 }
 .zen-linked-tabs-glyph { display: block; flex: 0 0 auto; pointer-events: none; }
 .zen-linked-tabs-pane-button > .zen-linked-tabs-glyph { width: 12px; height: 12px; }
-#zen-linked-tabs-button > .toolbarbutton-icon,
 .zen-linked-tabs-pane-button > .toolbarbutton-icon { display: none; }
 .zen-linked-tabs-pane-button .toolbarbutton-icon { width: 14px; height: 14px; }
 .zen-linked-tabs-pane-button > .toolbarbutton-text,
@@ -28,24 +21,56 @@
   opacity: 1;
   pointer-events: auto;
 }
-#zen-linked-tabs-button[zen-linked-tabs-role="source"],
-#zen-linked-tabs-button[zen-linked-tabs-role="destination"] {
-  color: var(--zen-primary-color, AccentColor);
-}
-.zen-linked-tabs-tab-indicator {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 12px;
+/* Replace Zen's existing sidebar-tab divider, including the active split state
+   where the native stylesheet normally hides it. Do not add tab-content nodes. */
+tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider]::after {
+  content: "→" !important;
+  display: block !important;
   width: 12px;
   height: 16px;
-  margin-inline-end: 4px;
+  position: absolute;
+  right: 0;
+  left: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  background: none !important;
   color: inherit;
+  font: 14px/16px system-ui, sans-serif;
+  text-align: center;
   opacity: 1;
-}
-.zen-linked-tabs-tab-indicator > svg {
-  display: block;
-  width: 12px;
-  height: 12px;
   pointer-events: none;
+  z-index: 1;
+}
+tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider="reverse"]::after {
+  content: "←" !important;
+}
+tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider] .tab-content {
+  padding-inline-end: 14px !important;
+}
+tab-group[split-view-group] .tab-group-container > .tabbrowser-tab:dir(rtl)[zen-linked-tabs-divider]::after {
+  right: auto;
+  left: 0;
+  content: "←" !important;
+}
+tab-group[split-view-group] .tab-group-container > .tabbrowser-tab:dir(rtl)[zen-linked-tabs-divider="reverse"]::after {
+  content: "→" !important;
+}
+/* Zen stacks the sidebar tabs vertically when the sidebar is collapsed. */
+:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider]::after {
+  content: "↓" !important;
+  width: 16px;
+  height: 12px;
+  line-height: 12px;
+  top: auto;
+  bottom: 0;
+  left: auto;
+  right: 50%;
+  transform: translateX(50%);
+}
+:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider="reverse"]::after {
+  content: "↑" !important;
+}
+:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider] .tab-content {
+  padding-inline-end: 4px !important;
 }
