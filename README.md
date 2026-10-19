@@ -1,8 +1,16 @@
-# Linked Tabs for Zen — v0.1.0 prototype
+# Linked Tabs for Zen — v0.2.0 prototype
 
 Keep a list, search result, or overview open in one split pane. Click its links to load them in the other pane, using Zen’s existing split tabs.
 
-**Status:** working source with 12 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. It has **not been run inside Zen** yet. Treat this as a first browser-test build, not a verified release.
+**Status:** 19 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. v0.2 adds controls directly to Zen’s native split-pane hover panels and hardens startup. It has **not been verified in a live Zen session** yet.
+
+## Update an existing Sine installation
+
+1. Open Zen Settings → Sine Mods (`about:preferences#sineMods`).
+2. Check for mod updates and update **Linked Tabs** to **0.2.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
+3. Confirm Sine’s **Enable installing JS from unofficial sources** setting is on and the individual Linked Tabs toggle is enabled.
+4. Fully quit and reopen Zen. If the version still appears stale, use `about:support` → **Clear startup cache…**.
+5. In an existing two-tab split, hover at the top center of either pane. Look for the **Linked Tabs** icon **between the drag handle and unsplit button**.
 
 ## Install through Sine
 
@@ -10,19 +18,19 @@ Keep a list, search result, or overview open in one split pane. Click its links 
 2. Create a **public GitHub repository**, for example `zen-linked-tabs`. Upload the **contents of this folder** to the repository root. `theme.json`, `linked-tabs.uc.js`, `modules/`, and `actors/` must be at the root; do not upload only the ZIP. Keep the `id` in `theme.json` as `zen-linked-tabs` because the entry point uses Sine’s corresponding chrome URL.
 3. Open Zen Settings → Sine Mods (`about:preferences#sineMods`). In Sine’s settings, enable **Enable installing JS from unofficial sources**. This is Sine’s global setting for custom JavaScript mods; these run with browser privileges.
 4. In Sine’s custom-repository input, enter `YOUR-USERNAME/zen-linked-tabs`, then install the mod and leave it enabled.
-5. Fully quit and reopen Zen. A **Linked Tabs** button appears in the navigation toolbar. If necessary, use `about:support` → **Clear startup cache…** once.
+5. Fully quit and reopen Zen. In split view, a **Linked Tabs** icon appears in each pane’s top-center hover strip, beside Zen’s native controls. A navigation-toolbar button is also added when that toolbar is available. If necessary, use `about:support` → **Clear startup cache…** once.
 
-The source ZIP is ready to upload to GitHub; it is not an XPI and cannot be installed by dragging it into Zen. Nothing has been published to your GitHub account automatically.
+This repository is a Sine JavaScript mod, not an XPI. Source ZIPs cannot be installed by dragging them into Zen.
 
 ## Use
 
 1. Open two ordinary tabs and put them into a split view using Zen’s native split-tab controls.
-2. Click inside the pane you want to keep in place. This is your **source**.
-3. Open the Linked Tabs toolbar menu and choose **Send this pane’s links → other pane**. You can also right-click the source tab and choose that action.
+2. Hover at the **top center** of the pane you want to keep in place. This is your **source**. Zen’s small strip with its drag and unsplit buttons appears.
+3. Click the **Linked Tabs** icon between those buttons, then choose **Open this pane’s links in the other pane**. The menu belongs to that pane, even if a different pane was selected. The original navigation-toolbar menu and source-tab context menu remain available as alternatives.
 4. Click a regular link in the source. Its URL loads in the existing **destination** tab, while the source stays put. Links with `target="_blank"` also reuse the destination.
 5. Choose **Reverse link direction** to switch roles, or **Unlink these tabs** to return to normal browsing.
 
-The source tab gets an `↗` marker and the destination gets an `↙` marker. The toolbar tooltip names the two tabs and the selected pane’s role.
+The source tab gets an `↗` marker and the destination gets an `↙` marker. Both hover-panel icons highlight when linked. Their menus identify each pane as source or destination, and offer **Reverse link direction** and **Unlink tabs**. The destination menu can also **Use this pane as the source**.
 
 **Toggle shortcut:** Ctrl+Alt+Shift+L on Windows/Linux; Command+Option+Shift+L on macOS. It links the selected pane if unlinked, or unlinks that pair. You can change or remove the `keyset` section in `modules/Controller.sys.mjs` if it conflicts with another shortcut.
 
@@ -72,17 +80,29 @@ Requires Node 20 or later. No `npm install` is needed.
 npm test
 ```
 
-Tests execute the actual policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. They do not establish that Gecko loads the actors or renders the toolbar correctly.
+Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. These tests do not establish that Gecko loads the actors or renders native menus correctly.
 
 ## Troubleshooting / remove
 
-- **No toolbar button:** check custom JavaScript is enabled in Sine, confirm the repository layout, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` errors. Use **Browser Console**, not the website’s developer console.
+- **No hover-panel or toolbar button:** check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.2.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console.
 - **Button appears but Link is disabled:** create an active split of exactly two tabs in the same container.
-- **Button appears but links do nothing:** test the fixture’s normal link first, then check the Browser Console. A JS-only navigation button or iframe link is intentionally outside v0.1 scope.
+- **Button appears but links do nothing:** test the fixture’s normal link first, then check the Browser Console. A JS-only navigation button or iframe link is intentionally outside this version’s scope.
 - **After updating:** fully quit and reopen Zen; imported privileged modules can remain cached until restart.
 - To remove, disable/uninstall **Linked Tabs** in Sine. The mod registers Sine’s unload callback to remove its UI, event listeners, routes, and actors when the last loaded window is detached. Restart if any state remains.
 
 For a useful bug report, include Zen version, Sine version, OS, site URL, steps, whether the fixture works, and the `[Linked Tabs]` console error.
+
+In the Browser Console, this read-only expression shows the current browser window’s diagnostic status:
+
+```js
+Services.wm.getMostRecentWindow("navigator:browser").ZenLinkedTabsStatus
+```
+
+- `undefined`: the entry script has not run in that window. Check Sine’s JS permission and the mod toggle.
+- `phase: "waiting-for-browser"`: the script loaded and is waiting for Zen’s APIs.
+- `phase: "ready", paneControls: 2`: controls have been attached to two native split headers.
+- `phase: "ready", paneControls: 0`: the controller loaded, but no native split headers were found yet.
+- `phase: "error"`: include the returned `error` string in your bug report.
 
 ## Architecture / references
 

@@ -4,6 +4,25 @@
   -moz-context-properties: fill;
   fill: currentColor;
 }
+.zen-view-splitter-header .zen-linked-tabs-pane-button {
+  min-width: 16px;
+  padding: 0;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+.zen-linked-tabs-pane-button .toolbarbutton-icon { width: 14px; height: 14px; }
+.zen-linked-tabs-pane-button > .toolbarbutton-text,
+.zen-linked-tabs-pane-button > .toolbarbutton-menu-dropmarker { display: none; }
+.zen-view-splitter-header .zen-linked-tabs-pane-button[zen-linked-tabs-role="source"],
+.zen-view-splitter-header .zen-linked-tabs-pane-button[zen-linked-tabs-role="destination"] {
+  opacity: 1;
+  background-color: color-mix(in srgb, currentColor 18%, transparent);
+  box-shadow: 0 0 0 1px currentColor;
+}
+.zen-view-splitter-header-container:has(.zen-linked-tabs-pane-button[open="true"]) {
+  opacity: 1;
+  pointer-events: auto;
+}
 #zen-linked-tabs-button[zen-linked-tabs-role="source"],
 #zen-linked-tabs-button[zen-linked-tabs-role="destination"] {
   color: var(--zen-primary-color, AccentColor);

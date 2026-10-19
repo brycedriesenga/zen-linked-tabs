@@ -2,7 +2,7 @@
   "id": "zen-linked-tabs",
   "name": "Linked Tabs",
   "description": "Keep one split pane in place while its links open in the other pane.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Bryce",
   "fork": ["zen"],
   "tags": ["tabs", "split-view", "productivity"],
