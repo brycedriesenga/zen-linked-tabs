@@ -5,14 +5,14 @@
   let controller;
   let startupTimer;
   let attempts = 0;
-  window.ZenLinkedTabsStatus = { version: "0.5.0", phase: "waiting-for-browser" };
+  window.ZenLinkedTabsStatus = { version: "0.5.1", phase: "waiting-for-browser" };
   const dispose = () => {
     disposed = true;
     window.clearTimeout(startupTimer);
     window.removeEventListener("load", start);
     controller?.destroy();
     window.removeEventListener("unload", dispose);
-    window.ZenLinkedTabsStatus = { version: "0.5.0", phase: "disabled" };
+    window.ZenLinkedTabsStatus = { version: "0.5.1", phase: "disabled" };
   };
   window.addEventListener("unload", dispose, { once: true });
   window.addUnloadListener?.(dispose);
@@ -36,10 +36,10 @@
       controller = new LinkedTabsController(window);
       window.ZenLinkedTabs = controller;
       controller.init();
-      console.info("[Linked Tabs] v0.5.0", window.ZenLinkedTabsStatus);
+      console.info("[Linked Tabs] v0.5.1", window.ZenLinkedTabsStatus);
     } catch (error) {
       controller?.destroy();
-      window.ZenLinkedTabsStatus = { version: "0.5.0", phase: "error", error: String(error) };
+      window.ZenLinkedTabsStatus = { version: "0.5.1", phase: "error", error: String(error) };
       console.error("[Linked Tabs] Could not initialize", error);
     }
   };

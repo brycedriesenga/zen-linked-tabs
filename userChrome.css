@@ -21,56 +21,60 @@
   opacity: 1;
   pointer-events: auto;
 }
-/* Replace Zen's existing sidebar-tab divider, including the active split state
-   where the native stylesheet normally hides it. Do not add tab-content nodes. */
-tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider]::after {
-  content: "→" !important;
-  display: block !important;
-  width: 12px;
-  height: 16px;
+/* One passive arrow at the split group's midpoint. Keep Zen's tab ::after
+   separator unchanged so its native inactive/active visibility still applies. */
+tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider]) {
+  position: relative;
+}
+tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider])::before {
+  content: "→";
+  display: block;
   position: absolute;
-  right: 0;
-  left: auto;
+  left: 50%;
   top: 50%;
-  bottom: auto;
-  transform: translateY(-50%);
-  background: none !important;
-  color: inherit;
-  font: 14px/16px system-ui, sans-serif;
-  text-align: center;
-  opacity: 1;
-  pointer-events: none;
-  z-index: 1;
-}
-tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider="reverse"]::after {
-  content: "←" !important;
-}
-tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider] .tab-content {
-  padding-inline-end: 14px !important;
-}
-tab-group[split-view-group] .tab-group-container > .tabbrowser-tab:dir(rtl)[zen-linked-tabs-divider]::after {
   right: auto;
-  left: 0;
-  content: "←" !important;
-}
-tab-group[split-view-group] .tab-group-container > .tabbrowser-tab:dir(rtl)[zen-linked-tabs-divider="reverse"]::after {
-  content: "→" !important;
-}
-/* Zen stacks the sidebar tabs vertically when the sidebar is collapsed. */
-:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider]::after {
-  content: "↓" !important;
-  width: 16px;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: 12px;
   height: 12px;
-  line-height: 12px;
-  top: auto;
-  bottom: 0;
-  left: auto;
-  right: 50%;
-  transform: translateX(50%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: 12px/12px system-ui, sans-serif;
+  text-align: center;
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 2;
 }
-:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider="reverse"]::after {
-  content: "↑" !important;
+tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider="reverse"])::before {
+  content: "←";
 }
-:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider] .tab-content {
-  padding-inline-end: 4px !important;
+tab-group[split-view-group] .tab-group-container:dir(rtl):has(> .tabbrowser-tab[zen-linked-tabs-divider])::before {
+  content: "←";
+}
+tab-group[split-view-group] .tab-group-container:dir(rtl):has(> .tabbrowser-tab[zen-linked-tabs-divider="reverse"])::before {
+  content: "→";
+}
+/* Symmetric room at the shared boundary keeps the arrow clear of both titles
+   and the second favicon. The native tab backgrounds retain their geometry. */
+:root[zen-sidebar-expanded="true"] tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider] .tab-content {
+  padding-inline-end: 8px !important;
+}
+:root[zen-sidebar-expanded="true"] tab-group[split-view-group] .tab-group-container > .tabbrowser-tab[zen-linked-tabs-divider] + .tabbrowser-tab .tab-content {
+  padding-inline-start: 8px !important;
+}
+/* Active split backgrounds replace the native line; keep the same centered
+   arrow, with slightly more contrast, over their shared boundary. */
+tab-group[split-view-group][hasactivetab] > .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider])::before,
+tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider]):has(> .tabbrowser-tab:is([multiselected], [visuallyselected]))::before {
+  opacity: 0.8;
+}
+/* The group stacks its two tabs vertically when the sidebar is collapsed. */
+:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider])::before {
+  content: "↓";
+}
+:root:not([zen-sidebar-expanded="true"]) tab-group[split-view-group] .tab-group-container:has(> .tabbrowser-tab[zen-linked-tabs-divider="reverse"])::before {
+  content: "↑";
 }

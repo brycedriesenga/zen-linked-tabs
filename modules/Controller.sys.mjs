@@ -212,7 +212,7 @@ export class LinkedTabsController {
     for (const pair of this.pairs) {
       const tabs = splitTabsFor(this.win, pair.source);
       if (tabs.length !== 2) continue;
-      // The native divider is the first sidebar tab's ::after pseudo-element.
+      // Mark the first tab to supply direction to the group's centered overlay.
       // Derive direction from sidebar order, not the page split's orientation.
       const first = tabs[0];
       first.setAttribute("zen-linked-tabs-divider", first === pair.source ? "forward" : "reverse");
@@ -279,7 +279,7 @@ export class LinkedTabsController {
     this.syncSplitDividers();
     this.syncPaneControls();
     this.win.ZenLinkedTabsStatus = {
-      version: "0.5.0", phase: this.routingError ? "error" : "ready",
+      version: "0.5.1", phase: this.routingError ? "error" : "ready",
       paneControls: this.paneControls.size, pairs: this.pairs.length,
       directionDividers: this.dividerTabs.size,
       navigation: { ...this.navigation },
@@ -302,6 +302,6 @@ export class LinkedTabsController {
     this.pairs = [];
     detach(this);
     if (this.win.ZenLinkedTabs === this) delete this.win.ZenLinkedTabs;
-    this.win.ZenLinkedTabsStatus = { version: "0.5.0", phase: "disabled" };
+    this.win.ZenLinkedTabsStatus = { version: "0.5.1", phase: "disabled" };
   }
 }
