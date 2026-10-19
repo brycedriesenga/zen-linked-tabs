@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linked Tabs — Destination test</title>
+<style>body { padding: 40px; font: 18px/1.6 system-ui; color: #202522; background: #e9efe6; } a { color: #215b45; }</style>
+<h1>Destination pane ↙</h1>
+<p id="test">Ready for links from the source.</p>
+<p><a href="destination.html?test=destination-native">A destination link</a> should behave normally.</p>
+<script>document.getElementById('test').textContent = 'Received test: ' + (new URLSearchParams(location.search).get('test') || 'none yet');</script>
+</html>

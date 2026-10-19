@@ -1,0 +1,123 @@
+import vm from "node:vm";
+import fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+
+export async function harness() {
+  const state = new Map();
+  const registered = new Map();
+  let serial = 0;
+  const Services = {
+    uuid: { generateUUID: () => `token-${++serial}` },
+    ppmm: { sharedData: { set: (k, v) => state.set(k, v), flush() {} } },
+    cpmm: { sharedData: { get: k => state.get(k) } },
+    io: { newURI: spec => ({ spec, schemeIs: scheme => new URL(spec).protocol === `${scheme}:` }) },
+    scriptSecurityManager: {
+      checkLoadURIStrWithPrincipal(principal, href) {
+        if (!principal || !/^https?:/.test(href)) throw new Error("Denied");
+      }
+    }
+  };
+  const E10SUtils = {
+    serializeReferrerInfo: value => value.data,
+    deserializeReferrerInfo: value => ({ referrer: value }),
+    serializePolicyContainer: value => value,
+    deserializePolicyContainer: value => value
+  };
+  const context = vm.createContext({
+    URL, console, Services, JSWindowActorChild: class {}, JSWindowActorParent: class {},
+    Cc: { "@mozilla.org/referrer-info;1": { createInstance: () => ({
+      initWithElement(node) { this.data = { url: node.ownerDocument.URL, rel: node.getAttribute("rel") }; }
+    }) } },
+    Ci: { nsIReferrerInfo: {} },
+    ChromeUtils: {
+      registerWindowActor(name, options) { registered.set(name, options); },
+      unregisterWindowActor(name) { registered.delete(name); }
+    }
+  });
+  const cache = new Map();
+  async function load(url) {
+    if (cache.has(url)) return cache.get(url);
+    if (url.startsWith("resource:")) {
+      const exports = url.includes("BrowserUtils") ? {
+        BrowserUtils: { hrefAndLinkNodeForClickEvent: event => [event.href, event.node] }
+      } : { E10SUtils };
+      const module = new vm.SyntheticModule(Object.keys(exports), function() {
+        for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
+      }, { context, identifier: url });
+      cache.set(url, module);
+      return module;
+    }
+    const code = await fs.readFile(fileURLToPath(url), "utf8");
+    const module = new vm.SourceTextModule(code, {
+      context, identifier: url, initializeImportMeta: meta => { meta.url = url; }
+    });
+    cache.set(url, module);
+    await module.link((spec, ref) => load(new URL(spec, ref.identifier).href));
+    return module;
+  }
+  async function imports(path) {
+    const module = await load(new URL(`../${path}`, import.meta.url).href);
+    if (module.status !== "evaluated") await module.evaluate();
+    return module.namespace;
+  }
+  return { imports, state, registered, Services };
+}
+
+class Node extends EventTarget {
+  constructor() { super(); this.attrs = new Map(); this.children = []; this.isConnected = true; }
+  setAttribute(k, v) { this.attrs.set(k, String(v)); }
+  getAttribute(k) { return this.attrs.get(k) ?? ""; }
+  removeAttribute(k) { this.attrs.delete(k); }
+  hasAttribute(k) { return this.attrs.has(k); }
+  appendChild(node) { this.children.push(node); return node; }
+  remove() { this.isConnected = false; }
+}
+
+export function browserWindow(firstId = 1) {
+  const win = new EventTarget();
+  win.AbortController = AbortController;
+  win.MutationObserver = class { observe() {} disconnect() {} };
+  win.document = {
+    createXULElement: () => new Node(), documentElement: new Node(),
+    getElementById: () => new Node()
+  };
+  const tabs = [firstId, firstId + 1].map(id => {
+    const tab = new Node();
+    tab.label = `Tab ${id}`;
+    const context = { id, usePrivateBrowsing: false };
+    context.top = context;
+    tab.linkedBrowser = {
+      ownerGlobal: win, browsingContext: context, loads: [],
+      loadURI(uri, options) { this.loads.push({ uri, options }); }
+    };
+    context.embedderElement = tab.linkedBrowser;
+    return tab;
+  });
+  const group = new Node();
+  group.setAttribute("split-view-group", "true");
+  group.tabs = tabs;
+  for (const tab of tabs) tab.group = group;
+  win.gBrowser = { tabs, selectedTab: tabs[0], tabContainer: new Node() };
+  win.gZenViewSplitter = { splitViewBrowsers: tabs.map(tab => tab.linkedBrowser) };
+  return { win, source: tabs[0], target: tabs[1] };
+}
+
+export function click(overrides = {}) {
+  const attrs = overrides.attrs || {};
+  const doc = {
+    URL: "https://example.com/search", nodePrincipal: { origin: "https://example.com" },
+    policyContainer: { csp: "source-policy" }, querySelector: () => null
+  };
+  return {
+    isTrusted: true, defaultPrevented: false, button: 0, type: "click",
+    href: "https://example.org/article",
+    node: {
+      ownerDocument: doc, hasAttribute: key => Object.hasOwn(attrs, key),
+      getAttribute: key => attrs[key] || ""
+    },
+    target: {}, prevented: false, stopped: false,
+    preventDefault() { this.prevented = true; },
+    stopImmediatePropagation() { this.stopped = true; },
+    ...overrides
+  };
+}

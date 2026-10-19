@@ -1,0 +1,18 @@
+#zen-linked-tabs-button .toolbarbutton-icon {
+  width: 16px;
+  height: 16px;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+#zen-linked-tabs-button[zen-linked-tabs-role="source"],
+#zen-linked-tabs-button[zen-linked-tabs-role="destination"] {
+  color: var(--zen-primary-color, AccentColor);
+}
+.tabbrowser-tab[zen-linked-tabs-role="source"] .tab-content::after,
+.tabbrowser-tab[zen-linked-tabs-role="destination"] .tab-content::after {
+  color: var(--zen-primary-color, AccentColor);
+  font-size: 12px;
+  padding-inline-start: 4px;
+}
+.tabbrowser-tab[zen-linked-tabs-role="source"] .tab-content::after { content: "↗"; }
+.tabbrowser-tab[zen-linked-tabs-role="destination"] .tab-content::after { content: "↙"; }

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linked Tabs — Source test</title>
+<style>
+  body { max-width: 700px; margin: 40px auto; padding: 20px; font: 18px/1.6 system-ui; color: #202522; background: #f5f7f4; }
+  a { color: #215b45; } li { margin: 16px 0; } iframe { width: 100%; border: 1px solid #aaa; }
+  #section { margin-top: 65vh; padding: 20px; background: #e3ecdf; }
+</style>
+<h1>Source pane ↗</h1>
+<p>Put this page in a split with <code>destination.html</code>, select this pane, then link it.</p>
+<ul>
+  <li><a href="destination.html?test=normal">Normal link</a> — opens in the destination.</li>
+  <li><a href="destination.html?test=new-tab" target="_blank">New-tab link</a> — also reuses the destination.</li>
+  <li><a href="destination.html?test=spa" id="spa">SPA-style link</a> — its JavaScript handler should be bypassed while linked.</li>
+  <li><a href="#section">Jump to section</a> — scrolls this source pane.</li>
+  <li><a download="linked-tabs-test.txt" href="data:text/plain,Download%20test">Download attribute</a> — remains a normal download.</li>
+  <li><a href="mailto:example@example.com">Mail link</a> — stays native.</li>
+</ul>
+<p id="result">SPA handler: has not run.</p>
+<p>Modifier-click or middle-click the normal link to verify native behavior.</p>
+<iframe title="Iframe boundary test" src="frame.html"></iframe>
+<div id="section"><h2>Section anchor</h2><p>This should scroll the source without changing the destination.</p></div>
+<script>
+  document.getElementById('spa').addEventListener('click', event => {
+    event.preventDefault();
+    document.getElementById('result').textContent = 'SPA handler: ran in the source (expected only when unlinked).';
+  });
+</script>
+</html>
