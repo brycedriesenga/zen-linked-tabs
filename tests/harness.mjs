@@ -73,6 +73,15 @@ export class Node extends EventTarget {
   getAttribute(k) { return this.attrs.get(k) ?? ""; }
   removeAttribute(k) { this.attrs.delete(k); }
   hasAttribute(k) { return this.attrs.has(k); }
+  get nextSibling() {
+    const siblings = this.parentNode?.children || [];
+    return siblings[siblings.indexOf(this) + 1] || null;
+  }
+  openPopup(anchor) {
+    this.popupAnchor = anchor;
+    this.openCount = (this.openCount || 0) + 1;
+    this.dispatchEvent(new Event("popupshowing"));
+  }
   appendChild(node) {
     node.parentNode?.removeChild(node);
     this.children.push(node); node.parentNode = this; node.isConnected = true; return node;
@@ -125,6 +134,11 @@ export function browserWindow(firstId = 1, options = {}) {
     };
     context.embedderElement = tab.linkedBrowser;
     tab.container = new Node();
+    const content = new Node(); content.setAttribute("class", "tab-content");
+    for (const name of ["tab-icon-stack", "tab-audio-button", "tab-label-container"]) {
+      const node = new Node(); node.setAttribute("class", name); content.appendChild(node);
+    }
+    tab.appendChild(content);
     return tab;
   });
   const group = new Node();

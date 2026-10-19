@@ -10,6 +10,7 @@ export class LinkedTabsController {
     this.pairs = [];
     this.nodes = [];
     this.paneControls = new Map();
+    this.tabIndicators = new Map();
     this.routingError = null;
     this.navigation = { received: 0, destinationRequests: 0, sourceFallbackRequests: 0, failures: 0, lastOutcome: "none" };
     this.abort = new win.AbortController();
@@ -115,9 +116,9 @@ export class LinkedTabsController {
       if (!header) continue;
       const button = this.make("toolbarbutton", {
         class: "zen-linked-tabs-pane-button", label: "Linked Tabs",
-        "aria-label": "Linked Tabs", type: "menu"
+        "aria-label": "Linked Tabs"
       });
-      this.addButtonIcon(button);
+      this.addButtonIcon(button, 12);
       // Alongside the native drag handle and unsplit button.
       header.insertBefore(button, header.querySelector(".zen-tab-unsplit-button"));
       const popup = this.make("menupopup", {}, button);
@@ -128,11 +129,33 @@ export class LinkedTabsController {
       const unlink = this.make("menuitem", { label: "Unlink tabs" }, popup);
       const ui = { button, popup, status, link, reverse, unlink };
       // Bind to this pane, not the selected tab: hovering needn't select a pane.
+      this.on(button, "command", event => {
+        // Commands from nested menuitems bubble through this button too.
+        if (event.target === button) this.toggle(tab);
+      });
+      const openMenu = event => {
+        if (event.target !== button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.updatePaneMenu(tab, ui);
+        popup.openPopup(button, "after_start", 0, 0, true, false, event);
+      };
+      this.on(button, "contextmenu", openMenu);
+      this.on(button, "keydown", event => {
+        if (event.key === "ArrowDown" || event.key === "ContextMenu" ||
+            (event.shiftKey && event.key === "F10")) openMenu(event);
+      });
       this.on(link, "command", () => this.link(tab));
       this.on(reverse, "command", () => this.reverse(tab));
       this.on(unlink, "command", () => this.unlink(tab));
       this.on(popup, "popupshowing", event => {
-        if (event.target === popup) this.updatePaneMenu(tab, ui);
+        if (event.target === popup) {
+          button.setAttribute("data-menu-open", "true");
+          this.updatePaneMenu(tab, ui);
+        }
+      });
+      this.on(popup, "popuphidden", event => {
+        if (event.target === popup) button.removeAttribute("data-menu-open");
       });
       this.paneControls.set(tab, ui);
     }
@@ -148,7 +171,8 @@ export class LinkedTabsController {
       this.canLink(tab) ? "Tabs are not linked" : "Requires two tabs in the same container";
     ui.button.setAttribute("zen-linked-tabs-role", role);
     this.updateButtonIcon(ui.button, !!pair);
-    ui.button.setAttribute("tooltiptext", "Linked Tabs: " + status);
+    ui.button.setAttribute("tooltiptext", "Linked Tabs: " + status +
+      (pair ? ". Click to unlink; right-click for options." : ". Click to link from this pane; right-click for options."));
     ui.status.setAttribute("label", status);
     ui.link.setAttribute("label", role === "destination" ? "Use this pane as the source" : "Open this pane’s links in the other pane");
     ui.link.disabled = !this.canLink(tab) || role === "source";
@@ -156,13 +180,13 @@ export class LinkedTabsController {
     ui.unlink.disabled = !pair;
   }
 
-  addButtonIcon(button) {
+  addButtonIcon(button, size = 16) {
     // Inline SVG avoids data-URI/context-fill image rendering differences in
     // native XUL headers. Author-provided content also skips anonymous images.
     const svg = this.win.document.createElementNS("http://www.w3.org/2000/svg", "svg");
     for (const [key, value] of Object.entries({
-      class: "zen-linked-tabs-glyph", viewBox: "0 0 24 24", width: "16", height: "16",
-      fill: "none", stroke: "currentColor", "stroke-width": "1.8",
+      class: "zen-linked-tabs-glyph", viewBox: "0 0 24 24", width: size, height: size,
+      fill: "none", stroke: "currentColor", "stroke-width": "1.6",
       "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true"
     })) svg.setAttribute(key, value);
     const path = this.win.document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -190,6 +214,53 @@ export class LinkedTabsController {
   }
 
   pairFor(tab) { return this.pairs.find(pair => pair.source === tab || pair.target === tab); }
+
+  toggle(tab) {
+    if (this.pairFor(tab)) this.unlink(tab);
+    else this.link(tab);
+  }
+
+  syncTabIndicators() {
+    const tabs = Array.from(this.win.gBrowser.tabs);
+    for (const [tab, indicator] of this.tabIndicators) {
+      const content = tab.querySelector(".tab-content");
+      if (!tabs.includes(tab) || !tab.hasAttribute("zen-linked-tabs-role") ||
+          !indicator.node.isConnected || indicator.node.parentNode !== content) {
+        indicator.node.remove();
+        this.nodes = this.nodes.filter(node => node !== indicator.node);
+        this.tabIndicators.delete(tab);
+      }
+    }
+    for (const tab of tabs) {
+      const role = tab.getAttribute("zen-linked-tabs-role");
+      if (!role) continue;
+      const content = tab.querySelector(".tab-content");
+      const favicon = tab.querySelector(".tab-icon-stack");
+      if (!content || !favicon || favicon.parentNode !== content) continue;
+      let indicator = this.tabIndicators.get(tab);
+      if (!indicator) {
+        const node = this.make("box", { class: "zen-linked-tabs-tab-indicator", role: "img", align: "center" });
+        const svg = this.win.document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        for (const [key, value] of Object.entries({
+          viewBox: "0 0 16 16", width: "12", height: "12", fill: "none",
+          stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round",
+          "stroke-linejoin": "round", "aria-hidden": "true"
+        })) svg.setAttribute(key, value);
+        const path = this.win.document.createElementNS("http://www.w3.org/2000/svg", "path");
+        svg.appendChild(path);
+        node.appendChild(svg);
+        // Separate sibling after the favicon: leave its overlays and audio control intact.
+        content.insertBefore(node, favicon.nextSibling);
+        indicator = { node, path };
+        this.tabIndicators.set(tab, indicator);
+      }
+      const label = role === "source" ? "Linked Tabs source: opens links in the other pane" :
+        "Linked Tabs destination: receives links from the other pane";
+      indicator.node.setAttribute("tooltiptext", label);
+      indicator.node.setAttribute("aria-label", label);
+      indicator.path.setAttribute("d", role === "source" ? "M4 12 12 4 M5 4h7v7" : "M12 4 4 12 M4 5v7h7");
+    }
+  }
 
   canLink(tab) {
     if (this.routingError) return false;
@@ -243,6 +314,7 @@ export class LinkedTabsController {
       pair.source.setAttribute("zen-linked-tabs-role", "source");
       pair.target.setAttribute("zen-linked-tabs-role", "destination");
     }
+    this.syncTabIndicators();
     const tab = this.win.gBrowser.selectedTab;
     const pair = this.pairFor(tab);
     const role = pair ? (pair.source === tab ? "source" : "destination") : "";
@@ -257,7 +329,7 @@ export class LinkedTabsController {
     if (this.routingError) this.button.setAttribute("tooltiptext", "Linked Tabs could not start — see Browser Console");
     this.syncPaneControls();
     this.win.ZenLinkedTabsStatus = {
-      version: "0.3.0", phase: this.routingError ? "error" : "ready",
+      version: "0.4.0", phase: this.routingError ? "error" : "ready",
       paneControls: this.paneControls.size, pairs: this.pairs.length,
       navigation: { ...this.navigation },
       ...(this.routingError ? { error: this.routingError } : {})
@@ -274,9 +346,10 @@ export class LinkedTabsController {
     for (const node of this.nodes) node.remove();
     this.nodes = [];
     this.paneControls.clear();
+    this.tabIndicators.clear();
     this.pairs = [];
     detach(this);
     if (this.win.ZenLinkedTabs === this) delete this.win.ZenLinkedTabs;
-    this.win.ZenLinkedTabsStatus = { version: "0.3.0", phase: "disabled" };
+    this.win.ZenLinkedTabsStatus = { version: "0.4.0", phase: "disabled" };
   }
 }

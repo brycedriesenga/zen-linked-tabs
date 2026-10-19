@@ -147,3 +147,86 @@ test("inline SVG changes between unlinked and linked states and resets after unl
   assert.equal(button.getAttribute("data-link-state"), "unlinked");
   c.destroy();
 });
+
+test("primary pane-button activation toggles that pane's pair without opening the menu", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win, source, target } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init();
+  const ui = c.paneControls.get(target);
+  assert.equal(ui.button.hasAttribute("type"), false);
+  ui.button.dispatchEvent(new Event("command"));
+  assert.equal(c.pairs[0].source, target);
+  assert.equal(ui.popup.openCount || 0, 0);
+  assert.equal(win.gBrowser.selectedTab, source);
+  ui.button.dispatchEvent(new Event("command"));
+  assert.equal(c.pairs.length, 0);
+  c.destroy();
+});
+
+test("right-click opens the anchored options menu without changing the link state", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win, source } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init();
+  const ui = c.paneControls.get(source);
+  const event = new Event("contextmenu", { cancelable: true });
+  ui.button.dispatchEvent(event);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(ui.popup.popupAnchor, ui.button);
+  assert.equal(c.pairs.length, 0);
+  assert.equal(ui.button.getAttribute("data-menu-open"), "true");
+  ui.popup.dispatchEvent(new Event("popuphidden"));
+  assert.equal(ui.button.hasAttribute("data-menu-open"), false);
+  c.link(source);
+  ui.button.dispatchEvent(new Event("contextmenu", { cancelable: true }));
+  assert.equal(c.pairs.length, 1);
+  c.destroy();
+});
+
+test("keyboard menu access does not toggle the pair, and nested menu commands do not toggle twice", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win, source } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init();
+  const ui = c.paneControls.get(source);
+  const key = new Event("keydown", { cancelable: true });
+  Object.defineProperty(key, "key", { value: "ArrowDown" });
+  ui.button.dispatchEvent(key);
+  assert.equal(ui.popup.openCount, 1);
+  assert.equal(c.pairs.length, 0);
+  c.link(source);
+  const nested = new Event("command");
+  Object.defineProperty(nested, "target", { value: ui.reverse });
+  ui.button.dispatchEvent(nested);
+  assert.equal(c.pairs.length, 1);
+  c.destroy();
+});
+
+test("direction indicators follow the favicon without replacing favicon overlays or the audio control", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win, source, target } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init();
+  const content = source.querySelector(".tab-content");
+  const favicon = source.querySelector(".tab-icon-stack");
+  const audio = source.querySelector(".tab-audio-button");
+  c.link(source);
+  const indicator = c.tabIndicators.get(source);
+  assert.equal(favicon.nextSibling, indicator.node);
+  assert.equal(indicator.node.nextSibling, audio);
+  assert.equal(source.querySelector(".tab-icon-stack"), favicon);
+  assert.match(indicator.node.getAttribute("tooltiptext"), /source/);
+  assert.notEqual(indicator.path.getAttribute("d"), c.tabIndicators.get(target).path.getAttribute("d"));
+  c.refresh();
+  assert.equal(content.children.length, 4);
+  c.unlink(source);
+  assert.equal(c.tabIndicators.size, 0);
+  assert.equal(content.children.length, 3);
+  assert.equal(favicon.nextSibling, audio);
+  c.destroy();
+});

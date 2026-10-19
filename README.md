@@ -1,13 +1,13 @@
-# Linked Tabs for Zen — v0.3.0 prototype
+# Linked Tabs for Zen — v0.4.0 prototype
 
 Keep a list, search result, or overview open in one split pane. Click its links to load them in the other pane, using Zen’s existing split tabs.
 
-**Status:** 25 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. v0.3 fixes navigation's use of the removed `ownerGlobal` API, adds acknowledged IPC with a source-pane fallback, and uses inline linked/unlinked SVG icons. It has **not been verified in a live Zen session** yet.
+**Status:** 29 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. The user confirmed core routing works in v0.3. v0.4 refines the controls and tab indicators; these latest UI changes have **not been verified in a live Zen session** yet.
 
 ## Update an existing Sine installation
 
 1. Open Zen Settings → Sine Mods (`about:preferences#sineMods`).
-2. Check for mod updates and update **Linked Tabs** to **0.3.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
+2. Check for mod updates and update **Linked Tabs** to **0.4.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
 3. Confirm Sine’s **Enable installing JS from unofficial sources** setting is on and the individual Linked Tabs toggle is enabled.
 4. Fully quit and reopen Zen. If the version still appears stale, use `about:support` → **Clear startup cache…**.
 5. In an existing two-tab split, hover at the top center of either pane. Look for the **Linked Tabs** icon **between the drag handle and unsplit button**.
@@ -26,11 +26,11 @@ This repository is a Sine JavaScript mod, not an XPI. Source ZIPs cannot be inst
 
 1. Open two ordinary tabs and put them into a split view using Zen’s native split-tab controls.
 2. Hover at the **top center** of the pane you want to keep in place. This is your **source**. Zen’s small strip with its drag and unsplit buttons appears.
-3. Click the **Linked Tabs** icon between those buttons, then choose **Open this pane’s links in the other pane**. The menu belongs to that pane, even if a different pane was selected. The original navigation-toolbar menu and source-tab context menu remain available as alternatives.
+3. **Left-click the Linked Tabs icon** between those buttons to link from that pane. Click it again to unlink. The action belongs to that pane, even if a different pane was selected.
 4. Click a regular link in the source. Its URL loads in the existing **destination** tab, while the source stays put. Links with `target="_blank"` also reuse the destination.
-5. Choose **Reverse link direction** to switch roles, or **Unlink these tabs** to return to normal browsing.
+5. **Right-click the icon** for the options menu: **Reverse link direction**, **Use this pane as the source** when appropriate, and **Unlink tabs**. For keyboard menu access, focus the button and press Down Arrow, Shift+F10, or the Context Menu key. The separate navigation-toolbar button still opens its menu normally, and the source-tab context menu remains available.
 
-The source tab gets an `↗` marker and the destination gets an `↙` marker. The hover-panel icon changes from a **broken chain** when unlinked to a **connected chain** when paired. Both icons also highlight when linked. Their menus identify each pane as source or destination, and offer **Reverse link direction** and **Unlink tabs**. The destination menu can also **Use this pane as the source**.
+The source tab gets an `↗` marker and the destination gets an `↙` marker **immediately after the favicon**, before the audio control and tab title. They use the tab’s inherited text color rather than the orange accent, improving contrast on inactive tabs. The favicon and its native overlays are preserved. The hover-panel icon is 12 px and changes from a **broken chain** when unlinked to a **connected chain** when paired, with no persistent outline or shaded background. Its tooltip explains left-click and right-click actions.
 
 **Toggle shortcut:** Ctrl+Alt+Shift+L on Windows/Linux; Command+Option+Shift+L on macOS. It links the selected pane if unlinked, or unlinks that pair. You can change or remove the `keyset` section in `modules/Controller.sys.mjs` if it conflicts with another shortcut.
 
@@ -81,11 +81,11 @@ Requires Node 20 or later. No `npm install` is needed.
 npm test
 ```
 
-Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. v0.3 tests cover current Gecko window properties without `ownerGlobal`, native-window fallback, asynchronous IPC errors, navigation exceptions, stale-document fallback suppression, and both SVG states. These tests do not establish that Gecko loads the actors or renders native menus correctly.
+Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. v0.3 tests cover current Gecko window properties without `ownerGlobal`, native-window fallback, asynchronous IPC errors, navigation exceptions, stale-document fallback suppression, and both SVG states. v0.4 adds primary-button toggling, context and keyboard menu access, nested command handling, and indicator placement without replacing native favicon/audio nodes. These tests do not establish that Gecko loads the actors or renders native menus correctly.
 
 ## Troubleshooting / remove
 
-- **No hover-panel or toolbar button:** check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.3.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console.
+- **No hover-panel or toolbar button:** check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.4.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console.
 - **Button appears but Link is disabled:** create an active split of exactly two tabs in the same container.
 - **Button appears but links do nothing:** test the fixture’s normal link first, then check the Browser Console. A JS-only navigation button or iframe link is intentionally outside this version’s scope.
 - **After updating:** fully quit and reopen Zen; imported privileged modules can remain cached until restart.
