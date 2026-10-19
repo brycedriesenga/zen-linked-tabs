@@ -126,3 +126,24 @@ test("module import failures expose a useful status", async () => {
   assert.equal(h.win.ZenLinkedTabsStatus.phase, "error");
   assert.match(h.win.ZenLinkedTabsStatus.error, /Module import failed/);
 });
+
+test("inline SVG changes between unlinked and linked states and resets after unlink", async () => {
+  const env = await harness();
+  const { LinkedTabsController } = await env.imports("modules/Controller.sys.mjs");
+  const { win, source, target } = browserWindow();
+  const c = new LinkedTabsController(win);
+  c.init();
+  const button = c.paneControls.get(source).button;
+  const shape = button.linkedTabsIconPath.getAttribute("d");
+  assert.equal(button.hasAttribute("image"), false);
+  assert.ok(button.querySelector(".zen-linked-tabs-glyph"));
+  assert.equal(button.getAttribute("data-link-state"), "unlinked");
+  c.link(source);
+  assert.notEqual(button.linkedTabsIconPath.getAttribute("d"), shape);
+  assert.equal(button.getAttribute("data-link-state"), "linked");
+  assert.equal(c.paneControls.get(target).button.getAttribute("data-link-state"), "linked");
+  c.unlink(source);
+  assert.equal(button.linkedTabsIconPath.getAttribute("d"), shape);
+  assert.equal(button.getAttribute("data-link-state"), "unlinked");
+  c.destroy();
+});

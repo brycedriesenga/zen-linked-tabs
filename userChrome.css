@@ -10,6 +10,10 @@
   -moz-context-properties: fill;
   fill: currentColor;
 }
+.zen-linked-tabs-glyph { display: block; flex: 0 0 auto; pointer-events: none; }
+.zen-linked-tabs-pane-button > .zen-linked-tabs-glyph { width: 14px; height: 14px; }
+#zen-linked-tabs-button > .toolbarbutton-icon,
+.zen-linked-tabs-pane-button > .toolbarbutton-icon { display: none; }
 .zen-linked-tabs-pane-button .toolbarbutton-icon { width: 14px; height: 14px; }
 .zen-linked-tabs-pane-button > .toolbarbutton-text,
 .zen-linked-tabs-pane-button > .toolbarbutton-menu-dropmarker { display: none; }

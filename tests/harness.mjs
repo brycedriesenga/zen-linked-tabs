@@ -110,7 +110,7 @@ export function browserWindow(firstId = 1, options = {}) {
   const elements = new Map();
   for (const id of ["nav-bar-customization-target", "nav-bar", "tabContextMenu"]) elements.set(id, new Node());
   win.document = {
-    createXULElement: () => new Node(), documentElement: new Node(),
+    createXULElement: () => new Node(), createElementNS: () => new Node(), documentElement: new Node(),
     getElementById: id => options.toolbar === false && id.startsWith("nav-bar") ? null : elements.get(id)
   };
   const tabs = [firstId, firstId + 1].map(id => {
@@ -119,7 +119,7 @@ export function browserWindow(firstId = 1, options = {}) {
     const context = { id, usePrivateBrowsing: false };
     context.top = context;
     tab.linkedBrowser = {
-      ownerGlobal: win, browsingContext: context, loads: [],
+      documentGlobal: win, ownerDocument: { defaultView: win }, browsingContext: context, loads: [],
       closest: () => tab.container,
       loadURI(uri, options) { this.loads.push({ uri, options }); }
     };

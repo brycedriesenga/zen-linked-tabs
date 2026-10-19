@@ -1,13 +1,13 @@
-# Linked Tabs for Zen — v0.2.0 prototype
+# Linked Tabs for Zen — v0.3.0 prototype
 
 Keep a list, search result, or overview open in one split pane. Click its links to load them in the other pane, using Zen’s existing split tabs.
 
-**Status:** 19 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. v0.2 adds controls directly to Zen’s native split-pane hover panels and hardens startup. It has **not been verified in a live Zen session** yet.
+**Status:** 25 passing automated tests against mocked browser APIs. The split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. v0.3 fixes navigation's use of the removed `ownerGlobal` API, adds acknowledged IPC with a source-pane fallback, and uses inline linked/unlinked SVG icons. It has **not been verified in a live Zen session** yet.
 
 ## Update an existing Sine installation
 
 1. Open Zen Settings → Sine Mods (`about:preferences#sineMods`).
-2. Check for mod updates and update **Linked Tabs** to **0.2.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
+2. Check for mod updates and update **Linked Tabs** to **0.3.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
 3. Confirm Sine’s **Enable installing JS from unofficial sources** setting is on and the individual Linked Tabs toggle is enabled.
 4. Fully quit and reopen Zen. If the version still appears stale, use `about:support` → **Clear startup cache…**.
 5. In an existing two-tab split, hover at the top center of either pane. Look for the **Linked Tabs** icon **between the drag handle and unsplit button**.
@@ -30,7 +30,7 @@ This repository is a Sine JavaScript mod, not an XPI. Source ZIPs cannot be inst
 4. Click a regular link in the source. Its URL loads in the existing **destination** tab, while the source stays put. Links with `target="_blank"` also reuse the destination.
 5. Choose **Reverse link direction** to switch roles, or **Unlink these tabs** to return to normal browsing.
 
-The source tab gets an `↗` marker and the destination gets an `↙` marker. Both hover-panel icons highlight when linked. Their menus identify each pane as source or destination, and offer **Reverse link direction** and **Unlink tabs**. The destination menu can also **Use this pane as the source**.
+The source tab gets an `↗` marker and the destination gets an `↙` marker. The hover-panel icon changes from a **broken chain** when unlinked to a **connected chain** when paired. Both icons also highlight when linked. Their menus identify each pane as source or destination, and offer **Reverse link direction** and **Unlink tabs**. The destination menu can also **Use this pane as the source**.
 
 **Toggle shortcut:** Ctrl+Alt+Shift+L on Windows/Linux; Command+Option+Shift+L on macOS. It links the selected pane if unlinked, or unlinks that pair. You can change or remove the `keyset` section in `modules/Controller.sys.mjs` if it conflicts with another shortcut.
 
@@ -46,6 +46,7 @@ Pairs are directional: destination links continue to behave normally. Independen
 - Pairs must use the **same Firefox container and private-browsing state**. A pair within one private window is allowed; no pairing state is written to disk.
 - Temporarily leaving a split pauses routing. Closing a tab, unsplitting, or adding a third pane clears an invalid pair. Browser restarts reset all pairs.
 - A click already sent across processes when a pair is unlinked or closed continues in the source if that source document is still current. A click from a replaced document is discarded. A source pane should therefore be a page you are comfortable navigating if a pair disappears at that exact moment.
+- If the parent actor cannot handle an intercepted click, it reports failure to the child, which attempts the original HTTP/HTTPS link in the still-current source document. This keeps an IPC or navigation error from silently swallowing the link. The fallback deliberately navigates the source, even for links that originally had `target="_blank"`.
 - Destination navigation uses the source document’s principal, referrer information, and policy container. It does not use a system principal for web navigation.
 - No dependencies, telemetry, analytics, server, or external code downloads. The mod itself makes no network requests; followed links navigate normally.
 
@@ -80,11 +81,11 @@ Requires Node 20 or later. No `npm install` is needed.
 npm test
 ```
 
-Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. These tests do not establish that Gecko loads the actors or renders native menus correctly.
+Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. v0.3 tests cover current Gecko window properties without `ownerGlobal`, native-window fallback, asynchronous IPC errors, navigation exceptions, stale-document fallback suppression, and both SVG states. These tests do not establish that Gecko loads the actors or renders native menus correctly.
 
 ## Troubleshooting / remove
 
-- **No hover-panel or toolbar button:** check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.2.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console.
+- **No hover-panel or toolbar button:** check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.3.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console.
 - **Button appears but Link is disabled:** create an active split of exactly two tabs in the same container.
 - **Button appears but links do nothing:** test the fixture’s normal link first, then check the Browser Console. A JS-only navigation button or iframe link is intentionally outside this version’s scope.
 - **After updating:** fully quit and reopen Zen; imported privileged modules can remain cached until restart.
@@ -103,6 +104,12 @@ Services.wm.getMostRecentWindow("navigator:browser").ZenLinkedTabsStatus
 - `phase: "ready", paneControls: 2`: controls have been attached to two native split headers.
 - `phase: "ready", paneControls: 0`: the controller loaded, but no native split headers were found yet.
 - `phase: "error"`: include the returned `error` string in your bug report.
+
+If links still fail after updating, keep a normal two-tab split linked, open **Browser Console**, filter for `Linked Tabs`, then click one ordinary link in the source. Copy the resulting errors and the status expression above. If the console input is unavailable, the logged errors alone are still useful.
+
+The `navigation` object reports how far routing got. `destinationRequests` counts accepted calls to the destination browser’s `loadURI` method; it does not guarantee the site finished loading. `sourceFallbackRequests` counts parent-requested source navigations. `lastOutcome` and `failures` identify a parent navigation error. A zero `received` count after a click points to the child/parent actor path. These diagnostics do not retain link URLs or page titles; navigation `lastError` stores only an exception name.
+
+The original v0.2 test browser mock exposed the obsolete `ownerGlobal` property, which hid the real-browser compatibility failure. The mock now exposes `documentGlobal` and `ownerDocument.defaultView` instead.
 
 ## Architecture / references
 

@@ -22,7 +22,7 @@ async function setup() {
   parent.manager = manager;
   parent.browsingContext.currentWindowGlobal = manager;
   const messages = [];
-  child.sendAsyncMessage = (name, data) => messages.push({ name, data });
+  child.sendQuery = (name, data) => new Promise(resolve => messages.push({ name, data, resolve }));
   return { ...env, win, source, target, controller, child, parent, messages, manager };
 }
 
@@ -178,7 +178,7 @@ test("parent refuses privileged URL IPC even from an enabled source", async () =
 test("synchronous IPC failure leaves native navigation intact", async () => {
   const h = await setup();
   h.controller.link(h.source);
-  h.child.sendAsyncMessage = () => { throw new Error("actor destroyed"); };
+  h.child.sendQuery = () => { throw new Error("actor destroyed"); };
   const event = click();
   h.child.handleEvent(event);
   assert.equal(event.prevented, false);
@@ -192,4 +192,74 @@ test("Sine metadata resolves real script and stylesheet entry points", async () 
   for (const path of [...Object.keys(theme.scripts), theme.style.chrome]) {
     assert.ok((await fs.stat(new URL(path, root))).isFile());
   }
+});
+
+test("navigation works with documentGlobal and no removed ownerGlobal property", async () => {
+  const h = await setup();
+  assert.equal(h.source.linkedBrowser.ownerGlobal, undefined);
+  h.controller.link(h.source);
+  const event = click();
+  h.child.handleEvent(event);
+  const result = h.parent.receiveMessage(h.messages[0]);
+  h.messages[0].resolve(result);
+  await Promise.resolve();
+  assert.equal(result.ok, true);
+  assert.equal(h.target.linkedBrowser.loads.length, 1);
+  assert.equal(h.win.ZenLinkedTabsStatus.navigation.destinationRequests, 1);
+  h.controller.destroy();
+});
+
+test("navigation can resolve the chrome window through ownerDocument.defaultView", async () => {
+  const h = await setup();
+  delete h.source.linkedBrowser.documentGlobal;
+  h.controller.link(h.source);
+  h.child.handleEvent(click());
+  const result = h.parent.receiveMessage(h.messages[0]);
+  assert.equal(result.ok, true);
+  assert.equal(h.target.linkedBrowser.loads.length, 1);
+  h.controller.destroy();
+});
+
+test("an asynchronous actor failure continues the consumed link in the source", async () => {
+  const h = await setup();
+  h.controller.link(h.source);
+  const event = click();
+  const fallback = [];
+  h.child.contentWindow = { document: event.node.ownerDocument, location: { assign: href => fallback.push(href) } };
+  h.child.sendQuery = () => Promise.reject(new Error("Parent actor unavailable"));
+  h.child.handleEvent(event);
+  await Promise.resolve();
+  assert.equal(event.prevented, true);
+  assert.deepEqual(fallback, [event.href]);
+  h.controller.destroy();
+});
+
+test("a parent navigation exception is acknowledged, counted and falls back in the source", async () => {
+  const h = await setup();
+  h.controller.link(h.source);
+  const event = click();
+  const fallback = [];
+  h.child.contentWindow = { document: event.node.ownerDocument, location: { assign: href => fallback.push(href) } };
+  h.target.linkedBrowser.loadURI = () => { throw new TypeError("load failed"); };
+  h.child.handleEvent(event);
+  const result = h.parent.receiveMessage(h.messages[0]);
+  assert.equal(result.ok, false);
+  h.messages[0].resolve(result);
+  await Promise.resolve();
+  assert.deepEqual(fallback, [event.href]);
+  assert.equal(h.win.ZenLinkedTabsStatus.navigation.failures, 1);
+  assert.equal(h.win.ZenLinkedTabsStatus.navigation.lastError, "TypeError");
+  h.controller.destroy();
+});
+
+test("an IPC failure does not replay a link in a replacement source document", async () => {
+  const h = await setup();
+  h.controller.link(h.source);
+  const fallback = [];
+  h.child.contentWindow = { document: {}, location: { assign: href => fallback.push(href) } };
+  h.child.sendQuery = () => Promise.reject(new Error("Old actor destroyed"));
+  h.child.handleEvent(click());
+  await Promise.resolve();
+  assert.equal(fallback.length, 0);
+  h.controller.destroy();
 });

@@ -28,10 +28,22 @@ export class ZenLinkedTabsV1Child extends JSWindowActorChild {
         referrerInfo: E10SUtils.serializeReferrerInfo(referrer),
         policyContainer: doc.policyContainer ? E10SUtils.serializePolicyContainer(doc.policyContainer) : null
       };
-      // Queue before consuming so synchronous actor failures leave the click alone.
-      this.sendAsyncMessage("LinkedTabs:Open", data);
+      // Acknowledge delivery: one-way IPC could consume a link even if the parent
+      // failed to load, returned early, or threw during navigation.
+      const pending = this.sendQuery("LinkedTabs:Open", data);
       event.preventDefault();
       event.stopImmediatePropagation();
+      const fallback = reason => {
+        console.error("[Linked Tabs] Routing failed; trying the source pane", reason);
+        try {
+          if (this.contentWindow.document === doc) this.contentWindow.location.assign(href);
+        } catch (error) {
+          console.error("[Linked Tabs] Source fallback was unavailable", error);
+        }
+      };
+      pending.then(result => {
+        if (!result?.ok) fallback(result?.outcome || "parent did not acknowledge navigation");
+      }, fallback);
     } catch (error) {
       console.error("[Linked Tabs] Link was left to the page", error);
     }
