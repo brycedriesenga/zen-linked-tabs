@@ -6,8 +6,22 @@ import { setMaxListeners } from "node:events";
 export async function harness(options = {}) {
   const state = new Map();
   const registered = new Map();
+  const prefs = new Map();
+  const prefObservers = new Set();
   let serial = 0;
   const Services = {
+    appinfo: { OS: options.OS || "Darwin" },
+    prefs: {
+      getBoolPref: (key, fallback) => prefs.has(key) ? prefs.get(key) : fallback,
+      setBoolPref(key, value) {
+        prefs.set(key, value);
+        for (const [branch, observer] of prefObservers) if (key.startsWith(branch)) observer.observe(null, "nsPref:changed", key);
+      },
+      addObserver: (branch, observer) => prefObservers.add([branch, observer]),
+      removeObserver(branch, observer) {
+        for (const item of prefObservers) if (item[0] === branch && item[1] === observer) prefObservers.delete(item);
+      }
+    },
     uuid: { generateUUID: () => `token-${++serial}` },
     ppmm: { sharedData: { set: (k, v) => state.set(k, v), flush() {} } },
     cpmm: { sharedData: { get: k => state.get(k) } },
@@ -64,7 +78,7 @@ export async function harness(options = {}) {
     if (module.status !== "evaluated") await module.evaluate();
     return module.namespace;
   }
-  return { imports, state, registered, Services };
+  return { imports, state, registered, Services, prefObservers };
 }
 
 export class Node extends EventTarget {
@@ -117,7 +131,7 @@ export function browserWindow(firstId = 1, options = {}) {
     disconnect() { this.disconnected = true; }
   };
   const elements = new Map();
-  for (const id of ["nav-bar-customization-target", "nav-bar", "tabContextMenu"]) elements.set(id, new Node());
+  for (const id of ["nav-bar-customization-target", "nav-bar", "tabContextMenu", "contentAreaContextMenu"]) elements.set(id, new Node());
   win.document = {
     createXULElement: () => new Node(), createElementNS: () => new Node(), documentElement: new Node(),
     getElementById: id => options.toolbar === false && id.startsWith("nav-bar") ? null : elements.get(id)
@@ -129,6 +143,9 @@ export function browserWindow(firstId = 1, options = {}) {
     context.top = context;
     tab.linkedBrowser = {
       documentGlobal: win, ownerDocument: { defaultView: win }, browsingContext: context, loads: [],
+      currentURI: { spec: "https://example.org/current", schemeIs: scheme => scheme === "https" },
+      contentPrincipal: { origin: "https://example.org" }, policyContainer: { csp: "saved-page-policy" },
+      focus() { this.focused = (this.focused || 0) + 1; },
       closest: () => tab.container,
       loadURI(uri, options) { this.loads.push({ uri, options }); }
     };
@@ -143,9 +160,31 @@ export function browserWindow(firstId = 1, options = {}) {
   });
   const group = new Node();
   group.setAttribute("split-view-group", "true");
-  group.tabs = tabs;
+  group.tabs = [...tabs];
   for (const tab of tabs) tab.group = group;
-  win.gBrowser = { tabs, selectedTab: tabs[0], tabContainer: new Node(), tabpanels: new Node() };
+  win.gBrowser = {
+    tabs, selectedTab: tabs[0], tabContainer: new Node(), tabpanels: new Node(),
+    getTabForBrowser: browser => tabs.find(tab => tab.linkedBrowser === browser),
+    added: [],
+    addTab(url, options) {
+      // A new tab starts outside every split; splitTabs below must establish it.
+      const { source: tab } = browserWindow(firstId + tabs.length + 100);
+      delete tab.group;
+      tab.linkedBrowser.documentGlobal = win;
+      tab.linkedBrowser.ownerDocument.defaultView = win;
+      tab.linkedBrowser.currentURI = { spec: url, schemeIs: scheme => url.startsWith(scheme + ":") };
+      tab.setAttribute("usercontextid", options.userContextId || "0");
+      tab.linkedBrowser.browsingContext.usePrivateBrowsing = tabs[0].linkedBrowser.browsingContext.usePrivateBrowsing;
+      tabs.push(tab);
+      this.added.push({ url, options, tab });
+      return tab;
+    },
+    removeTab(tab) {
+      tabs.splice(tabs.indexOf(tab), 1);
+      if (tab.group) tab.group.tabs = tab.group.tabs.filter(item => item !== tab);
+      tab.closing = true; tab.isConnected = false;
+    }
+  };
   for (const tab of tabs) win.gBrowser.tabpanels.appendChild(tab.container);
   win.installHeaders = () => {
     for (const tab of tabs) {
@@ -159,7 +198,17 @@ export function browserWindow(firstId = 1, options = {}) {
     }
   };
   if (options.headers !== false) win.installHeaders();
-  win.gZenViewSplitter = { splitViewBrowsers: tabs.map(tab => tab.linkedBrowser) };
+  win.gZenViewSplitter = {
+    splitViewBrowsers: tabs.map(tab => tab.linkedBrowser),
+    splitTabs(items, grid, index) {
+      const nextGroup = new Node(); nextGroup.setAttribute("split-view-group", "true");
+      nextGroup.tabs = items;
+      for (const tab of items) tab.group = nextGroup;
+      this.splitViewBrowsers = items.map(tab => tab.linkedBrowser);
+      win.gBrowser.selectedTab = items[index];
+      return { tabs: items };
+    }
+  };
   return { win, source: tabs[0], target: tabs[1] };
 }
 
@@ -173,6 +222,7 @@ export function click(overrides = {}) {
     isTrusted: true, defaultPrevented: false, button: 0, type: "click",
     href: "https://example.org/article",
     node: {
+      isConnected: true, style: new Style(),
       ownerDocument: doc, hasAttribute: key => Object.hasOwn(attrs, key),
       getAttribute: key => attrs[key] || ""
     },
@@ -181,4 +231,12 @@ export function click(overrides = {}) {
     stopImmediatePropagation() { this.stopped = true; },
     ...overrides
   };
+}
+
+export class Style {
+  constructor() { this.values = new Map(); }
+  getPropertyValue(key) { return this.values.get(key)?.[0] || ""; }
+  getPropertyPriority(key) { return this.values.get(key)?.[1] || ""; }
+  setProperty(key, value, priority = "") { this.values.set(key, [value, priority]); }
+  removeProperty(key) { this.values.delete(key); }
 }

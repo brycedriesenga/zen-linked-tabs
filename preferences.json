@@ -1,0 +1,50 @@
+[
+  {
+    "type": "separator",
+    "label": "Browsing behavior"
+  },
+  {
+    "type": "checkbox",
+    "label": "Focus the destination after opening links",
+    "property": "zen-linked-tabs.focus-destination",
+    "defaultValue": false
+  },
+  {
+    "type": "checkbox",
+    "label": "Mark the last link opened (subtle dotted outline on the source page)",
+    "property": "zen-linked-tabs.mark-last-link",
+    "defaultValue": false
+  },
+  {
+    "type": "separator",
+    "label": "Open a link in the source pane: hold exactly the selected modifiers while left-clicking. Select none to disable. Default: Alt/Option + Shift."
+  },
+  {
+    "type": "checkbox",
+    "label": "Alt / Option",
+    "property": "zen-linked-tabs.source-modifier.alt",
+    "defaultValue": true
+  },
+  {
+    "type": "checkbox",
+    "label": "Shift",
+    "property": "zen-linked-tabs.source-modifier.shift",
+    "defaultValue": true
+  },
+  {
+    "type": "checkbox",
+    "label": "Control",
+    "property": "zen-linked-tabs.source-modifier.ctrl",
+    "defaultValue": false
+  },
+  {
+    "type": "checkbox",
+    "label": "Command / Windows / Meta",
+    "property": "zen-linked-tabs.source-modifier.meta",
+    "defaultValue": false
+  },
+  {
+    "type": "separator",
+    "label": "Other modifier combinations keep their normal behavior. Custom combinations replace the browser action only for eligible links in a linked source pane. Desktop or accessibility shortcuts may intercept a combination before Zen receives it."
+  }
+]

@@ -1,11 +1,75 @@
 import { BrowserUtils } from "resource://gre/modules/BrowserUtils.sys.mjs";
 import { E10SUtils } from "resource://gre/modules/E10SUtils.sys.mjs";
-import { ROUTES_KEY, eligibleLink } from "../modules/Policy.sys.mjs";
+import { ROUTES_KEY, eligibleLink, sourceOverrideMatches } from "../modules/Policy.sys.mjs";
 
 export class ZenLinkedTabsV1Child extends JSWindowActorChild {
+  route() {
+    return Services.cpmm.sharedData.get(ROUTES_KEY)?.[this.browsingContext.top.id];
+  }
+
+  clearMarker() {
+    if (!this.marker) return;
+    const { node, previous, applied } = this.marker;
+    for (const name of Object.keys(previous)) {
+      if (node.style.getPropertyValue(name) !== applied[name] || node.style.getPropertyPriority(name) !== "important") continue;
+      const [value, priority] = previous[name];
+      if (value) node.style.setProperty(name, value, priority);
+      else node.style.removeProperty(name);
+    }
+    this.marker = null;
+  }
+
+  mark(node, token) {
+    // Direct state messages also gate markers while sharedData propagation is
+    // in flight, so a late acknowledgment cannot repaint an unlinked source.
+    const route = this.markerState === undefined ? this.route() : this.markerState;
+    if (!route?.markLastLink || route.token !== token || !node?.style ||
+        this.contentWindow.document !== node.ownerDocument || !node.isConnected) return;
+    this.clearMarker();
+    const previous = {};
+    const applied = {};
+    for (const [name, value] of Object.entries({ "outline-width": "1px", "outline-style": "dotted", "outline-color": "currentColor", "outline-offset": "2px" })) {
+      previous[name] = [node.style.getPropertyValue(name), node.style.getPropertyPriority(name)];
+      node.style.setProperty(name, value, "important");
+      applied[name] = node.style.getPropertyValue(name);
+    }
+    this.marker = { node, token, previous, applied };
+  }
+
+  receiveMessage({ name, data }) {
+    if (name === "LinkedTabs:State") {
+      this.markerState = data;
+      if (!data?.markLastLink || data.token !== this.marker?.token) this.clearMarker();
+    } else if (name === "LinkedTabs:MarkContextLink") {
+      const last = this.contextLink;
+      if (last?.href === data.href && last.node.ownerDocument === this.contentWindow.document) {
+        this.clickSequence = (this.clickSequence || 0) + 1;
+        this.mark(last.node, data.token);
+      }
+    }
+  }
+
+  didDestroy() {
+    this.disposed = true;
+    this.clearMarker();
+    this.contextLink = null;
+  }
+
   handleEvent(event) {
-    const route = Services.cpmm.sharedData.get(ROUTES_KEY)?.[this.browsingContext.top.id];
-    if (!route) return;
+    if (event.type === "pagehide") {
+      this.clearMarker();
+      this.contextLink = null;
+      this.clickSequence = (this.clickSequence || 0) + 1;
+      return;
+    }
+    if (event.type === "contextmenu") {
+      const [href, node] = BrowserUtils.hrefAndLinkNodeForClickEvent(event);
+      this.contextLink = event.isTrusted && node ? { href, node } : null;
+      return;
+    }
+    const route = this.route();
+    if (!route) { this.clearMarker(); return; }
+    const inSource = sourceOverrideMatches(event, route.sourceModifiers);
     const [href, node] = BrowserUtils.hrefAndLinkNodeForClickEvent(event);
     if (!href || !node) return;
     const doc = node.ownerDocument;
@@ -14,7 +78,7 @@ export class ZenLinkedTabsV1Child extends JSWindowActorChild {
     if (!eligibleLink({
       trusted: event.isTrusted, prevented: event.defaultPrevented,
       button: event.button,
-      modified: event.altKey || event.ctrlKey || event.metaKey || event.shiftKey,
+      modified: !inSource && (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey),
       editable: clicked?.isContentEditable || doc.designMode === "on",
       download: node.hasAttribute("download"), target, href, documentURL: doc.URL
     })) return;
@@ -24,12 +88,13 @@ export class ZenLinkedTabsV1Child extends JSWindowActorChild {
       const referrer = Cc["@mozilla.org/referrer-info;1"].createInstance(Ci.nsIReferrerInfo);
       referrer.initWithElement(node);
       const data = {
-        href, token: route.token,
+        href, token: route.token, mode: inSource ? "source" : "destination",
         referrerInfo: E10SUtils.serializeReferrerInfo(referrer),
         policyContainer: doc.policyContainer ? E10SUtils.serializePolicyContainer(doc.policyContainer) : null
       };
       // Acknowledge delivery: one-way IPC could consume a link even if the parent
       // failed to load, returned early, or threw during navigation.
+      const sequence = this.clickSequence = (this.clickSequence || 0) + 1;
       const pending = this.sendQuery("LinkedTabs:Open", data);
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -43,6 +108,10 @@ export class ZenLinkedTabsV1Child extends JSWindowActorChild {
       };
       pending.then(result => {
         if (!result?.ok) fallback(result?.outcome || "parent did not acknowledge navigation");
+        else if (!this.disposed && sequence === this.clickSequence && result.outcome === "destination-requested") {
+          try { this.mark(node, route.token); }
+          catch (error) { console.error("[Linked Tabs] Could not mark the last link", error); }
+        }
       }, fallback);
     } catch (error) {
       console.error("[Linked Tabs] Link was left to the page", error);

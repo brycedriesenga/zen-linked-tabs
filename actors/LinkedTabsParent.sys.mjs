@@ -20,6 +20,7 @@ export class ZenLinkedTabsV1Parent extends JSWindowActorParent {
     }
     const data = message.data;
     if (!data || typeof data.href !== "string" || typeof data.token !== "string") return { ok: false, outcome: "invalid-message" };
+    if (data.mode && !["source", "destination"].includes(data.mode)) return { ok: false, outcome: "invalid-mode" };
     const principal = this.manager.documentPrincipal;
     try {
       const uri = Services.io.newURI(data.href);
@@ -27,7 +28,8 @@ export class ZenLinkedTabsV1Parent extends JSWindowActorParent {
       Services.scriptSecurityManager.checkLoadURIStrWithPrincipal(principal, data.href);
       const target = win.ZenLinkedTabs?.destinationFor(browser, data.token);
       // If unlinked/unsplit/closed between click and IPC, continue in the source.
-      const destination = target || browser;
+      const inSource = data.mode === "source";
+      const destination = inSource ? browser : target || browser;
       const options = {
         triggeringPrincipal: principal,
         referrerInfo: E10SUtils.deserializeReferrerInfo(data.referrerInfo),
@@ -37,8 +39,11 @@ export class ZenLinkedTabsV1Parent extends JSWindowActorParent {
       };
       if (data.policyContainer) options.policyContainer = E10SUtils.deserializePolicyContainer(data.policyContainer);
       destination.loadURI(uri, options);
-      const outcome = target ? "destination-requested" : "source-fallback-requested";
+      const outcome = target ? (inSource ? "source-requested" : "destination-requested") : "source-fallback-requested";
       record(outcome);
+      // Focus failure must never replay a link that was already navigated.
+      try { if (target) win.ZenLinkedTabs.focusAfterNavigation(browser, data.token, inSource); }
+      catch (error) { console.error("[Linked Tabs] Could not focus the linked pane", error); }
       return { ok: true, outcome };
     } catch (error) {
       record("navigation-error", error?.name || "Error");

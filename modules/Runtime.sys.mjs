@@ -18,7 +18,11 @@ export function attach(controller) {
       parent: { esModuleURI: base + "LinkedTabsParent.sys.mjs" },
       child: {
         esModuleURI: base + "LinkedTabsChild.sys.mjs",
-        events: { click: { capture: true, wantUntrusted: false } }
+        events: {
+          click: { capture: true, wantUntrusted: false },
+          contextmenu: { capture: true, wantUntrusted: false },
+          pagehide: { capture: true, wantUntrusted: false }
+        }
       },
       matches: ["http://*/*", "https://*/*"],
       allFrames: false,

@@ -2,6 +2,13 @@
 export const ROUTES_KEY = "zen-linked-tabs/v1/routes";
 export const ACTOR_NAME = "ZenLinkedTabsV1";
 
+export function sourceOverrideMatches(event, modifiers = {}) {
+  const keys = ["alt", "ctrl", "meta", "shift"];
+  // Empty disables the override. Additional modifiers and AltGr are native.
+  return keys.some(key => modifiers[key]) && !event.getModifierState?.("AltGraph") &&
+    keys.every(key => !!event[key + "Key"] === !!modifiers[key]);
+}
+
 export function eligibleLink({ trusted, prevented, button, modified, editable,
   download, target, href, documentURL }) {
   if (!trusted || prevented || button !== 0 || modified || editable || download) return false;

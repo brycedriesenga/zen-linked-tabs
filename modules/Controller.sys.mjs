@@ -1,5 +1,7 @@
 import { splitTabsFor, usablePair, pairIsVisible } from "./Policy.sys.mjs";
 import { attach, detach, publish } from "./Runtime.sys.mjs";
+import { PREF_BRANCH, readSettings, modifierLabel } from "./Settings.sys.mjs";
+import { contextLink, canOpenLinked, openLinked, openInSource, canKeepPage, keepPage, paneTitle, focusAfterNavigation } from "./Actions.sys.mjs";
 
 const LINKED_PATH = "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71";
 const UNLINKED_PATH = "m18.84 12.25 1.77-1.77a5 5 0 0 0-7.07-7.07l-1.77 1.77 M5.16 11.75l-1.77 1.77a5 5 0 0 0 7.07 7.07l1.77-1.77 M8 2v3 M2 8h3 M16 19v3 M19 16h3";
@@ -12,7 +14,9 @@ export class LinkedTabsController {
     this.paneControls = new Map();
     this.dividerTabs = new Set();
     this.routingError = null;
-    this.navigation = { received: 0, destinationRequests: 0, sourceFallbackRequests: 0, failures: 0, lastOutcome: "none" };
+    this.settings = readSettings();
+    this.sourceBrowsers = new Set();
+    this.navigation = { received: 0, destinationRequests: 0, sourceRequests: 0, sourceFallbackRequests: 0, failures: 0, lastOutcome: "none" };
     this.abort = new win.AbortController();
     this.destroyed = false;
   }
@@ -38,19 +42,31 @@ export class LinkedTabsController {
     if (tabMenu) {
       this.contextItem = make("menuitem", { id: "zen-linked-tabs-context", label: "Send this pane’s links → other pane" });
       tabMenu.appendChild(this.contextItem);
+      this.keepContextItem = make("menuitem", { label: "Keep this page as a separate tab", hidden: "true" });
+      tabMenu.appendChild(this.keepContextItem);
       on(tabMenu, "popupshowing", event => {
         if (event.target !== tabMenu) return;
         const tab = win.TabContextMenu?.contextTab || win.gBrowser.selectedTab;
         const pair = this.pairFor(tab);
         this.contextItem.setAttribute("label", pair ? "Unlink these tabs" : "Send this pane’s links → other pane");
         this.contextItem.disabled = !pair && !this.canLink(tab);
+        this.keepContextItem.hidden = !pair || pair.target !== tab;
+        this.keepContextItem.disabled = !canKeepPage(this, tab);
       });
       on(this.contextItem, "command", () => {
         const tab = win.TabContextMenu?.contextTab || win.gBrowser.selectedTab;
         if (this.pairFor(tab)) this.unlink(tab);
         else this.link(tab);
       });
+      on(this.keepContextItem, "command", () => this.runAction(() => keepPage(this, win.TabContextMenu?.contextTab || win.gBrowser.selectedTab)));
     }
+
+    this.initLinkContextMenu();
+    this.prefObserver = { observe: () => {
+      this.settings = readSettings();
+      this.refresh();
+    } };
+    Services.prefs.addObserver(PREF_BRANCH, this.prefObserver);
 
     const commandset = make("commandset", { id: "zen-linked-tabs-commands" });
     const command = make("command", { id: "zen-linked-tabs-toggle-command" }, commandset);
@@ -86,6 +102,51 @@ export class LinkedTabsController {
     this.refresh();
   }
 
+  runAction(action) {
+    try {
+      delete this.lastActionError;
+      const result = action();
+      this.refresh();
+      return result;
+    } catch (error) {
+      this.lastActionError = error?.name || "Error";
+      console.error("[Linked Tabs] Could not complete the menu action", error);
+      this.refresh();
+      return false;
+    }
+  }
+
+  initLinkContextMenu() {
+    const menu = this.win.document.getElementById("contentAreaContextMenu");
+    if (!menu) return;
+    this.openLinkedItem = this.make("menuitem", { id: "zen-linked-tabs-open-linked", label: "Open in linked split", hidden: "true" });
+    this.openSourceItem = this.make("menuitem", { id: "zen-linked-tabs-open-source", label: "Open link in this pane", hidden: "true" });
+    const anchor = this.win.document.getElementById("context-openlinkintab")?.nextSibling;
+    menu.insertBefore(this.openLinkedItem, anchor);
+    menu.insertBefore(this.openSourceItem, anchor);
+    this.on(menu, "popupshowing", event => {
+      if (event.target !== menu) return;
+      const link = this.menuLink = contextLink(this, this.win.gContextMenu);
+      const pair = link && this.pairFor(link.source);
+      this.openLinkedItem.hidden = !link;
+      this.openLinkedItem.disabled = !canOpenLinked(this, link);
+      this.openLinkedItem.setAttribute("label", pair?.source === link?.source ? "Open in linked pane" : "Open in linked split");
+      this.openSourceItem.hidden = !link || !pair || pair.source !== link.source;
+      this.openSourceItem.disabled = !pair || !pairIsVisible(this.win, pair);
+    });
+    // Native menus can hide before dispatching the command. Retain one bounded
+    // snapshot until command, next popup, or unload; document identity is checked
+    // again before using it. Do not clear it on popuphidden.
+    this.on(this.openLinkedItem, "command", () => {
+      const link = this.menuLink; this.menuLink = null;
+      this.runAction(() => openLinked(this, link));
+    });
+    this.on(this.openSourceItem, "command", () => {
+      const link = this.menuLink; this.menuLink = null;
+      this.runAction(() => openInSource(this, link));
+    });
+  }
+
   syncPaneControls() {
     const tabs = Array.from(this.win.gBrowser.tabs);
     const headerFor = tab => tab.linkedBrowser?.closest(".browserSidebarContainer")?.querySelector(".zen-view-splitter-header");
@@ -103,7 +164,7 @@ export class LinkedTabsController {
       if (!header) continue;
       const button = this.make("toolbarbutton", {
         class: "zen-linked-tabs-pane-button", label: "Linked Tabs",
-        "aria-label": "Linked Tabs"
+        "aria-label": "Linked Tabs", "aria-pressed": "false", "aria-haspopup": "menu", "aria-expanded": "false"
       });
       this.addButtonIcon(button, 12);
       // Alongside the native drag handle and unsplit button.
@@ -114,7 +175,8 @@ export class LinkedTabsController {
       const link = this.make("menuitem", { label: "Open this pane’s links in the other pane" }, popup);
       const reverse = this.make("menuitem", { label: "Reverse link direction" }, popup);
       const unlink = this.make("menuitem", { label: "Unlink tabs" }, popup);
-      const ui = { button, popup, status, link, reverse, unlink };
+      const keep = this.make("menuitem", { label: "Keep this page as a separate tab", hidden: "true" }, popup);
+      const ui = { button, popup, status, link, reverse, unlink, keep };
       // Bind to this pane, not the selected tab: hovering needn't select a pane.
       this.on(button, "command", event => {
         // Commands from nested menuitems bubble through this button too.
@@ -135,14 +197,19 @@ export class LinkedTabsController {
       this.on(link, "command", () => this.link(tab));
       this.on(reverse, "command", () => this.reverse(tab));
       this.on(unlink, "command", () => this.unlink(tab));
+      this.on(keep, "command", () => this.runAction(() => keepPage(this, tab)));
       this.on(popup, "popupshowing", event => {
         if (event.target === popup) {
           button.setAttribute("data-menu-open", "true");
+          button.setAttribute("aria-expanded", "true");
           this.updatePaneMenu(tab, ui);
         }
       });
       this.on(popup, "popuphidden", event => {
-        if (event.target === popup) button.removeAttribute("data-menu-open");
+        if (event.target === popup) {
+          button.removeAttribute("data-menu-open");
+          button.setAttribute("aria-expanded", "false");
+        }
       });
       this.paneControls.set(tab, ui);
     }
@@ -153,18 +220,26 @@ export class LinkedTabsController {
     const pair = this.pairFor(tab);
     const role = pair ? (pair.source === tab ? "source" : "destination") : "";
     const status = this.routingError ? "Linked Tabs could not start — see Browser Console" :
-      role === "source" ? "Source pane → links open in the other pane" :
-      role === "destination" ? "Destination pane ← receives links from the other pane" :
+      this.lastActionError ? "Could not complete the last action — see Browser Console" :
+      role === "source" ? `Source: links open in “${paneTitle(pair.target)}”` :
+      role === "destination" ? `Destination: receives links from “${paneTitle(pair.source)}”` :
       this.canLink(tab) ? "Tabs are not linked" : "Requires two tabs in the same container";
     ui.button.setAttribute("zen-linked-tabs-role", role);
     this.updateButtonIcon(ui.button, !!pair);
-    ui.button.setAttribute("tooltiptext", "Linked Tabs: " + status +
-      (pair ? ". Click to unlink; right-click for options." : ". Click to link from this pane; right-click for options."));
+    const modifier = modifierLabel(this.settings.sourceModifiers, Services.appinfo.OS === "Darwin");
+    const tooltip = "Linked Tabs: " + status +
+      (pair ? ". Click to unlink; right-click for options." : ". Click to link from this pane; right-click for options.") +
+      (role === "source" && modifier ? ` ${modifier}-click a link to open it in this pane.` : "");
+    ui.button.setAttribute("tooltiptext", tooltip);
+    ui.button.setAttribute("aria-label", tooltip);
+    ui.button.setAttribute("aria-pressed", String(!!pair));
     ui.status.setAttribute("label", status);
     ui.link.setAttribute("label", role === "destination" ? "Use this pane as the source" : "Open this pane’s links in the other pane");
     ui.link.disabled = !this.canLink(tab) || role === "source";
     ui.reverse.disabled = !pair || !!this.routingError;
     ui.unlink.disabled = !pair;
+    ui.keep.hidden = role !== "destination";
+    ui.keep.disabled = !canKeepPage(this, tab);
   }
 
   addButtonIcon(button, size = 16) {
@@ -192,6 +267,7 @@ export class LinkedTabsController {
     this.navigation.received++;
     this.navigation.lastOutcome = outcome;
     if (outcome === "destination-requested") this.navigation.destinationRequests++;
+    if (outcome === "source-requested") this.navigation.sourceRequests++;
     if (outcome === "source-fallback-requested") this.navigation.sourceFallbackRequests++;
     if (outcome === "navigation-error") this.navigation.failures++;
     if (error) this.navigation.lastError = error;
@@ -256,7 +332,7 @@ export class LinkedTabsController {
     for (const pair of this.pairs) {
       if (pairIsVisible(this.win, pair)) {
         const id = pair.source.linkedBrowser.browsingContext?.id;
-        if (id) routes[id] = { token: pair.token };
+        if (id) routes[id] = { token: pair.token, markLastLink: this.settings.markLastLink, sourceModifiers: this.settings.sourceModifiers };
       }
     }
     return routes;
@@ -266,6 +342,22 @@ export class LinkedTabsController {
     if (this.destroyed || this.routingError) return null;
     const pair = this.pairs.find(item => item.source.linkedBrowser === browser && item.token === token);
     return pair && pairIsVisible(this.win, pair) ? pair.target.linkedBrowser : null;
+  }
+
+  focusAfterNavigation(browser, token, inSource = false) {
+    focusAfterNavigation(this, browser, token, inSource);
+  }
+
+  notifySourceStates() {
+    const routes = this.routes();
+    const next = new Set(this.pairs.map(pair => pair.source.linkedBrowser));
+    for (const browser of new Set([...this.sourceBrowsers, ...next])) {
+      try {
+        browser.browsingContext.currentWindowGlobal?.getActor("ZenLinkedTabsV1")
+          .sendAsyncMessage("LinkedTabs:State", routes[browser.browsingContext.id] || null);
+      } catch {} // A closed/non-web document has no actor or marker to clear.
+    }
+    this.sourceBrowsers = next;
   }
 
   refresh() {
@@ -279,18 +371,21 @@ export class LinkedTabsController {
     this.syncSplitDividers();
     this.syncPaneControls();
     this.win.ZenLinkedTabsStatus = {
-      version: "0.5.2", phase: this.routingError ? "error" : "ready",
+      version: "0.6.0", phase: this.routingError ? "error" : "ready",
       paneControls: this.paneControls.size, pairs: this.pairs.length,
       directionDividers: this.dividerTabs.size,
-      navigation: { ...this.navigation },
+      navigation: { ...this.navigation }, settings: this.settings,
+      ...(this.lastActionError ? { lastActionError: this.lastActionError } : {}),
       ...(this.routingError ? { error: this.routingError } : {})
     };
     publish();
+    this.notifySourceStates();
   }
 
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.prefObserver) Services.prefs.removeObserver(PREF_BRANCH, this.prefObserver);
     this.abort.abort();
     this.observer?.disconnect();
     for (const tab of this.win.gBrowser.tabs) tab.removeAttribute("zen-linked-tabs-role");
@@ -300,8 +395,10 @@ export class LinkedTabsController {
     for (const tab of this.dividerTabs) tab.removeAttribute("zen-linked-tabs-divider");
     this.dividerTabs.clear();
     this.pairs = [];
+    this.notifySourceStates();
+    this.menuLink = null;
     detach(this);
     if (this.win.ZenLinkedTabs === this) delete this.win.ZenLinkedTabs;
-    this.win.ZenLinkedTabsStatus = { version: "0.5.2", phase: "disabled" };
+    this.win.ZenLinkedTabsStatus = { version: "0.6.0", phase: "disabled" };
   }
 }

@@ -2,16 +2,27 @@
   "id": "zen-linked-tabs",
   "name": "Linked Tabs",
   "description": "Keep one split pane in place while its links open in the other pane.",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "author": "Bryce",
-  "fork": ["zen"],
-  "tags": ["tabs", "split-view", "productivity"],
-  "style": { "chrome": "userChrome.css" },
+  "fork": [
+    "zen"
+  ],
+  "tags": [
+    "tabs",
+    "split-view",
+    "productivity"
+  ],
+  "style": {
+    "chrome": "userChrome.css"
+  },
   "scripts": {
     "linked-tabs.uc.js": {
       "name": "Linked Tabs",
-      "include": ["chrome://browser/content/browser.xhtml"]
+      "include": [
+        "chrome://browser/content/browser.xhtml"
+      ]
     }
   },
-  "supportsUnload": true
+  "supportsUnload": true,
+  "preferences": "preferences.json"
 }
