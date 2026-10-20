@@ -11,9 +11,294 @@
   },
   {
     "type": "checkbox",
-    "label": "Mark the last link opened (subtle dotted outline on the source page)",
+    "label": "Mark the last link opened on the source page",
     "property": "zen-linked-tabs.mark-last-link",
     "defaultValue": false
+  },
+  {
+    "type": "separator",
+    "label": "Marker appearance \u2014 preview styles from a pane\u2019s Linked Tabs menu \u2192 Preview marker appearance\u2026"
+  },
+  {
+    "type": "dropdown",
+    "label": "Marker style",
+    "property": "zen-linked-tabs.marker.style",
+    "defaultValue": "badge",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "badge",
+        "label": "Badge"
+      },
+      {
+        "value": "underline",
+        "label": "Underline"
+      },
+      {
+        "value": "highlight",
+        "label": "Soft highlight"
+      },
+      {
+        "value": "combined",
+        "label": "Underline + highlight"
+      },
+      {
+        "value": "outline",
+        "label": "Outline"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Marker color",
+    "property": "zen-linked-tabs.marker.color",
+    "defaultValue": "accent",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "accent",
+        "label": "Browser accent"
+      },
+      {
+        "value": "link",
+        "label": "Link text color"
+      },
+      {
+        "value": "custom",
+        "label": "Custom color"
+      }
+    ]
+  },
+  {
+    "type": "string",
+    "label": "Custom color (hex, for example #6366f1)",
+    "property": "zen-linked-tabs.marker.custom-color",
+    "defaultValue": "#6366f1",
+    "placeholder": "#6366f1"
+  },
+  {
+    "type": "dropdown",
+    "label": "Emphasis",
+    "property": "zen-linked-tabs.marker.emphasis",
+    "defaultValue": "normal",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "subtle",
+        "label": "Subtle"
+      },
+      {
+        "value": "normal",
+        "label": "Normal"
+      },
+      {
+        "value": "strong",
+        "label": "Strong"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Badge icon",
+    "property": "zen-linked-tabs.marker.icon",
+    "defaultValue": "arrow",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "arrow",
+        "label": "Arrow"
+      },
+      {
+        "value": "dot",
+        "label": "Dot"
+      },
+      {
+        "value": "split",
+        "label": "Split panes"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Badge size",
+    "property": "zen-linked-tabs.marker.size",
+    "defaultValue": "14",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "12",
+        "label": "Small \u00b7 12px"
+      },
+      {
+        "value": "14",
+        "label": "Medium \u00b7 14px"
+      },
+      {
+        "value": "16",
+        "label": "Large \u00b7 16px"
+      },
+      {
+        "value": "18",
+        "label": "Extra large \u00b7 18px"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Badge placement",
+    "property": "zen-linked-tabs.marker.position",
+    "defaultValue": "auto",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "auto",
+        "label": "Automatic (before, after, then above title)"
+      },
+      {
+        "value": "before",
+        "label": "Before first line"
+      },
+      {
+        "value": "after",
+        "label": "After first line"
+      },
+      {
+        "value": "corner",
+        "label": "Above leading corner"
+      }
+    ]
+  },
+  {
+    "type": "separator",
+    "label": "Advanced marker styling \u2014 0 uses the emphasis preset for thickness and opacity. All sizes are CSS pixels."
+  },
+  {
+    "type": "dropdown",
+    "label": "Line thickness",
+    "property": "zen-linked-tabs.marker.thickness",
+    "defaultValue": "0",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "0",
+        "label": "Automatic"
+      },
+      {
+        "value": "1",
+        "label": "1px"
+      },
+      {
+        "value": "2",
+        "label": "2px"
+      },
+      {
+        "value": "3",
+        "label": "3px"
+      },
+      {
+        "value": "4",
+        "label": "4px"
+      },
+      {
+        "value": "5",
+        "label": "5px"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Underline offset",
+    "property": "zen-linked-tabs.marker.offset",
+    "defaultValue": "2",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "0",
+        "label": "0px"
+      },
+      {
+        "value": "1",
+        "label": "1px"
+      },
+      {
+        "value": "2",
+        "label": "2px"
+      },
+      {
+        "value": "3",
+        "label": "3px"
+      },
+      {
+        "value": "4",
+        "label": "4px"
+      },
+      {
+        "value": "6",
+        "label": "6px"
+      },
+      {
+        "value": "8",
+        "label": "8px"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Highlight opacity",
+    "property": "zen-linked-tabs.marker.opacity",
+    "defaultValue": "0",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "0",
+        "label": "Automatic"
+      },
+      {
+        "value": "10",
+        "label": "10%"
+      },
+      {
+        "value": "15",
+        "label": "15%"
+      },
+      {
+        "value": "20",
+        "label": "20%"
+      },
+      {
+        "value": "30",
+        "label": "30%"
+      },
+      {
+        "value": "40",
+        "label": "40%"
+      },
+      {
+        "value": "60",
+        "label": "60%"
+      }
+    ]
+  },
+  {
+    "type": "dropdown",
+    "label": "Outline line style",
+    "property": "zen-linked-tabs.marker.outline-style",
+    "defaultValue": "solid",
+    "placeholder": false,
+    "options": [
+      {
+        "value": "solid",
+        "label": "Solid"
+      },
+      {
+        "value": "dotted",
+        "label": "Dotted"
+      },
+      {
+        "value": "dashed",
+        "label": "Dashed"
+      }
+    ]
   },
   {
     "type": "separator",

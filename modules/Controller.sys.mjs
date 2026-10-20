@@ -176,6 +176,8 @@ export class LinkedTabsController {
       const reverse = this.make("menuitem", { label: "Reverse link direction" }, popup);
       const unlink = this.make("menuitem", { label: "Unlink tabs" }, popup);
       const keep = this.make("menuitem", { label: "Keep this page as a separate tab", hidden: "true" }, popup);
+      this.make("menuseparator", {}, popup);
+      const preview = this.make("menuitem", { label: "Preview marker appearance…" }, popup);
       const ui = { button, popup, status, link, reverse, unlink, keep };
       // Bind to this pane, not the selected tab: hovering needn't select a pane.
       this.on(button, "command", event => {
@@ -198,6 +200,7 @@ export class LinkedTabsController {
       this.on(reverse, "command", () => this.reverse(tab));
       this.on(unlink, "command", () => this.unlink(tab));
       this.on(keep, "command", () => this.runAction(() => keepPage(this, tab)));
+      this.on(preview, "command", () => this.runAction(() => this.openMarkerPreview()));
       this.on(popup, "popupshowing", event => {
         if (event.target === popup) {
           button.setAttribute("data-menu-open", "true");
@@ -332,10 +335,26 @@ export class LinkedTabsController {
     for (const pair of this.pairs) {
       if (pairIsVisible(this.win, pair)) {
         const id = pair.source.linkedBrowser.browsingContext?.id;
-        if (id) routes[id] = { token: pair.token, markLastLink: this.settings.markLastLink, sourceModifiers: this.settings.sourceModifiers };
+        if (id) routes[id] = { token: pair.token, markLastLink: this.settings.markLastLink, sourceModifiers: this.settings.sourceModifiers, marker: this.markerOptions() };
       }
     }
     return routes;
+  }
+
+  markerOptions() {
+    let accentColor = "#6366f1";
+    try {
+      accentColor = this.win.getComputedStyle(this.win.document.documentElement).getPropertyValue("--zen-primary-color").trim() || "AccentColor";
+    } catch {}
+    return { ...this.settings.marker, accentColor };
+  }
+
+  openMarkerPreview() {
+    const url = new URL("../marker-preview.html", import.meta.url);
+    url.hash = encodeURIComponent(JSON.stringify(this.markerOptions()));
+    const tab = this.win.gBrowser.addTrustedTab(url.href, { inBackground: false, skipRoute: true });
+    if (tab) this.win.gBrowser.selectedTab = tab;
+    return !!tab;
   }
 
   destinationFor(browser, token) {
@@ -371,7 +390,7 @@ export class LinkedTabsController {
     this.syncSplitDividers();
     this.syncPaneControls();
     this.win.ZenLinkedTabsStatus = {
-      version: "0.6.0", phase: this.routingError ? "error" : "ready",
+      version: "0.7.0", phase: this.routingError ? "error" : "ready",
       paneControls: this.paneControls.size, pairs: this.pairs.length,
       directionDividers: this.dividerTabs.size,
       navigation: { ...this.navigation }, settings: this.settings,
@@ -399,6 +418,6 @@ export class LinkedTabsController {
     this.menuLink = null;
     detach(this);
     if (this.win.ZenLinkedTabs === this) delete this.win.ZenLinkedTabs;
-    this.win.ZenLinkedTabsStatus = { version: "0.6.0", phase: "disabled" };
+    this.win.ZenLinkedTabsStatus = { version: "0.7.0", phase: "disabled" };
   }
 }

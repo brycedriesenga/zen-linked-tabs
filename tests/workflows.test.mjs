@@ -292,7 +292,7 @@ test("the source link context-menu exception navigates that pane and preserves t
   h.controller.destroy();
 });
 
-test("optional last-link marker follows successful destination requests and restores existing inline styles", async () => {
+test("optional marker follows acknowledged navigation without modifying existing inline styles", async () => {
   const h = await setup(); h.controller.link(h.source); h.pref("mark-last-link", true);
   const first = click();
   first.node.style.setProperty("outline-color", "red", "important");
@@ -301,16 +301,23 @@ test("optional last-link marker follows successful destination requests and rest
   h.child.handleEvent(first);
   assert.equal(first.node.style.getPropertyValue("outline-style"), "");
   await h.deliver(0);
-  assert.equal(first.node.style.getPropertyValue("outline-style"), "dotted");
+  assert.equal(h.child.marker.node, first.node);
+  assert.equal(h.child.marker.renderer.options.style, "badge");
+  const firstRenderer = h.child.marker.renderer;
   const second = click(); second.node.ownerDocument = first.node.ownerDocument;
   h.child.handleEvent(second); await h.deliver(1);
   assert.equal(first.node.style.getPropertyValue("outline-color"), "red");
   assert.equal(first.node.style.getPropertyPriority("outline-color"), "important");
   assert.equal(first.node.style.getPropertyValue("outline-width"), "3px");
   assert.equal(first.node.style.getPropertyValue("outline-style"), "");
-  assert.equal(second.node.style.getPropertyValue("outline-style"), "dotted");
+  assert.equal(h.child.marker.node, second.node);
+  assert.equal(firstRenderer.destroyed, true);
+  const lastRenderer = h.child.marker.renderer;
+  h.Services.prefs.setStringPref("zen-linked-tabs.marker.style", "combined");
+  assert.equal(lastRenderer.options.style, "combined");
   h.pref("mark-last-link", false);
-  assert.equal(second.node.style.getPropertyValue("outline-style"), "");
+  assert.equal(lastRenderer.destroyed, true);
+  assert.equal(h.child.marker, null);
   h.controller.destroy();
 });
 
@@ -318,7 +325,9 @@ test("markers clear on unlink, direction reversal, pagehide, and unload without 
   const h = await setup(); h.controller.link(h.source); h.pref("mark-last-link", true);
   const event = click(); h.child.contentWindow = { document: event.node.ownerDocument };
   const mark = () => h.child.mark(event.node, h.controller.pairFor(h.source).token);
-  mark(); h.controller.unlink(h.source);
+  mark(); const renderer = h.child.marker.renderer; h.controller.unlink(h.source);
+  assert.equal(renderer.destroyed, true);
+  assert.equal(h.child.marker, null);
   assert.equal(event.node.style.getPropertyValue("outline-style"), "");
   h.controller.link(h.source); mark(); h.controller.reverse(h.source);
   assert.equal(event.node.style.getPropertyValue("outline-style"), "");
@@ -337,7 +346,7 @@ test("out-of-order acknowledgments and failed or source navigations do not mark 
   h.child.handleEvent(first); h.child.handleEvent(second);
   await h.deliver(1); await h.deliver(0);
   assert.equal(first.node.style.getPropertyValue("outline-style"), "");
-  assert.equal(second.node.style.getPropertyValue("outline-style"), "dotted");
+  assert.equal(h.child.marker.node, second.node);
   const third = click({ altKey: true, shiftKey: true }); third.node.ownerDocument = first.node.ownerDocument;
   h.child.handleEvent(third); await h.deliver(2);
   assert.equal(third.node.style.getPropertyValue("outline-style"), "");
@@ -354,7 +363,8 @@ test("context-menu opening can mark the actual clicked link without modifying pa
   h.child.handleEvent(event);
   showContext(h, h.source, { linkURL: event.href });
   h.controller.openLinkedItem.dispatchEvent(new Event("command"));
-  assert.equal(event.node.style.getPropertyValue("outline-style"), "dotted");
+  assert.equal(h.child.marker.node, event.node);
+  assert.equal(event.node.style.getPropertyValue("outline-style"), "");
   assert.equal(event.prevented, false);
   h.controller.destroy();
 });
@@ -379,7 +389,28 @@ test("Sine settings expose every runtime default with the same type and value", 
   const preferences = JSON.parse(await fs.readFile(new URL("../preferences.json", import.meta.url), "utf8"));
   for (const [key, value] of Object.entries(DEFAULTS)) {
     const pref = preferences.find(item => item.property === PREF_BRANCH + key);
-    assert.equal(pref.type, "checkbox"); assert.equal(pref.defaultValue, value);
+    assert.equal(pref.type, typeof value === "boolean" ? "checkbox" : key === "marker.custom-color" ? "string" : "dropdown");
+    assert.equal(typeof value === "number" ? Number(pref.defaultValue) : pref.defaultValue, value);
+    if (typeof value === "number") {
+      assert.equal(typeof pref.defaultValue, "string");
+      assert.equal(pref.value, undefined);
+      assert.ok(pref.options.every(item => typeof item.value === "string"));
+    }
   }
+  h.controller.destroy();
+});
+
+test("string-valued Sine numeric choices and legacy integer preferences update a visible marker", async () => {
+  const h = await setup(); h.controller.link(h.source); h.pref("mark-last-link", true);
+  const event = click(); h.child.contentWindow = { document: event.node.ownerDocument };
+  h.child.mark(event.node, h.controller.pairs[0].token);
+  const renderer = h.child.marker.renderer;
+  h.Services.prefs.setStringPref("zen-linked-tabs.marker.size", "18");
+  h.Services.prefs.setStringPref("zen-linked-tabs.marker.opacity", "30");
+  assert.equal(renderer.options.size, 18); assert.equal(renderer.options.opacity, 30);
+  h.Services.prefs.setIntPref("zen-linked-tabs.marker.size", 16);
+  assert.equal(renderer.options.size, 16);
+  h.Services.prefs.setStringPref("zen-linked-tabs.marker.size", "invalid");
+  assert.equal(renderer.options.size, 14);
   h.controller.destroy();
 });

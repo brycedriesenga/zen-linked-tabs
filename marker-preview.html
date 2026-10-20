@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linked Tabs · Marker appearance</title>
+<style>
+  :root { color-scheme: light dark; font: 15px/1.5 system-ui,sans-serif; background: light-dark(#f6f7fa,#18191d); color: light-dark(#22242b,#eff0f6); }
+  * { box-sizing: border-box; }
+  body { max-width: 1080px; margin: 0 auto; padding: 40px 32px 80px; }
+  h1 { font-size: 28px; letter-spacing: -.025em; margin: 0 0 8px; }
+  header p { margin: 0 0 28px; opacity: .75; max-width: 740px; }
+  main { display: grid; grid-template-columns: 270px minmax(0,1fr); gap: 32px; align-items: start; }
+  .controls, .sample { background: light-dark(white,#25262c); border: 1px solid light-dark(#e1e3ec,#3c3e49); border-radius: 12px; padding: 24px; }
+  .controls { display: grid; gap: 14px; }
+  label { display: grid; gap: 5px; font-size: 13px; }
+  select, input { font: inherit; width: 100%; border: 1px solid light-dark(#c5c8d4,#555969); border-radius: 6px; background: light-dark(white,#30323a); color: inherit; padding: 7px; }
+  input[type=color] { height: 36px; padding: 3px; }
+  details { border-top: 1px solid light-dark(#e1e3ec,#444652); padding-top: 12px; }
+  details>div { display: grid; gap: 12px; margin-top: 12px; }
+  .samples { display: grid; gap: 20px; min-width: 0; }
+  .sample { padding: 26px 32px; position: relative; }
+  .eyebrow { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .09em; opacity: .65; margin: 0 0 18px; }
+  a { color: light-dark(#234fc8,#a8bfff); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h3 { font-size: 20px; line-height: 1.35; font-weight: 550; margin: 5px 0; }
+  .result { display: block; }
+  .site { display: flex; align-items: center; gap: 8px; color: light-dark(#333844,#c4c7d1); font-size: 12px; }
+  .favicon { width: 22px; height: 22px; display: grid; place-items: center; background: light-dark(#f0f1f7,#393b44); border-radius: 50%; font-weight: bold; }
+  .description { margin: 8px 0 0; opacity: .75; font-size: 13px; }
+  article { position: relative; }
+  article h3 { font-size: 19px; line-height: 1.45; }
+  .full-post-link { position: absolute; inset: 0; z-index: 1; }
+  .meta { color: light-dark(#687080,#a5acbd); font-size: 12px; margin-bottom: 10px; }
+  .meta button { position: relative; z-index: 2; margin-inline-start: 8px; border: 0; border-radius: 4px; padding: 2px 8px; }
+  .narrow { max-width: 300px; font-size: 18px; line-height: 1.6; }
+  .scroll { max-height: 130px; overflow: auto; padding: 10px 28px; border: 1px solid light-dark(#e1e3ec,#444652); border-radius: 8px; }
+  .scroll p { margin: 0 0 18px; }
+  #status { min-height: 24px; margin: 0; opacity: .8; }
+  .hint { font-size: 12px; opacity: .7; margin: 0; }
+  @media(max-width:720px) { body { padding: 24px 18px; } main { grid-template-columns: 1fr; gap: 20px; } .controls { grid-template-columns: repeat(2,minmax(0,1fr)); padding: 18px; } .controls details { grid-column: 1/-1; } .sample { padding: 24px; } }
+</style>
+<header>
+  <h1>Marker appearance</h1>
+  <p>Choose a style, then click a sample link to move the marker. These changes are a preview. Apply your choices in Sine → Linked Tabs → Settings.</p>
+</header>
+<main>
+  <div class="controls" id="controls" aria-label="Appearance controls"></div>
+  <div class="samples">
+    <p id="status" role="status" aria-live="polite">Select a sample link.</p>
+    <section class="sample">
+      <p class="eyebrow">Search result · heading inside a larger link</p>
+      <a class="result" href="#search" id="search-link">
+        <div class="site"><span class="favicon">S</span><span>Example site<br>example.com › guides</span></div>
+        <h3>Finding your next trail: a guide to quieter places nearby</h3>
+      </a>
+      <p class="description">The marker should follow the title, leaving the favicon and site details alone.</p>
+    </section>
+    <section class="sample">
+      <p class="eyebrow">Community feed · separate full-card link</p>
+      <article>
+        <div class="meta">Community · 2 hours ago <button type="button">Join</button></div>
+        <a class="full-post-link" href="#community" id="community-link" aria-label="A long community post title"></a>
+        <h3 data-testid="post-title">What small changes have made browsing long discussions and finding useful replies easier for you?</h3>
+        <p class="description">A wrapped title with a separate clickable layer and neighboring controls.</p>
+      </article>
+    </section>
+    <section class="sample">
+      <p class="eyebrow">Inline link · multiple lines</p>
+      <p class="narrow">Try <a href="#wrapped" id="wrapped-link">a longer inline link that wraps naturally over several lines of text</a> in a paragraph.</p>
+    </section>
+    <section class="sample">
+      <p class="eyebrow">Scroll container</p>
+      <div class="scroll">
+        <p><a href="#scroll" id="scroll-link">A link inside a small scrolling panel</a></p>
+        <p>Scroll down after marking the link. The marker should stay clipped to this panel.</p>
+        <p>More content to make the panel scroll.</p>
+      </div>
+    </section>
+    <p class="hint">Automatic badge placement tries before the first line, after it, then above its leading corner. If every position is crowded or clipped, the badge stays hidden rather than covering text.</p>
+  </div>
+</main>
+<script type="module" src="marker-preview.mjs"></script>
+</html>

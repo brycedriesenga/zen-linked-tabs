@@ -1,6 +1,7 @@
 import { BrowserUtils } from "resource://gre/modules/BrowserUtils.sys.mjs";
 import { E10SUtils } from "resource://gre/modules/E10SUtils.sys.mjs";
 import { ROUTES_KEY, eligibleLink, sourceOverrideMatches } from "../modules/Policy.sys.mjs";
+import { LinkMarker } from "../modules/Marker.sys.mjs";
 
 export class ZenLinkedTabsV1Child extends JSWindowActorChild {
   route() {
@@ -9,13 +10,7 @@ export class ZenLinkedTabsV1Child extends JSWindowActorChild {
 
   clearMarker() {
     if (!this.marker) return;
-    const { node, previous, applied } = this.marker;
-    for (const name of Object.keys(previous)) {
-      if (node.style.getPropertyValue(name) !== applied[name] || node.style.getPropertyPriority(name) !== "important") continue;
-      const [value, priority] = previous[name];
-      if (value) node.style.setProperty(name, value, priority);
-      else node.style.removeProperty(name);
-    }
+    this.marker.renderer.destroy();
     this.marker = null;
   }
 
@@ -26,20 +21,14 @@ export class ZenLinkedTabsV1Child extends JSWindowActorChild {
     if (!route?.markLastLink || route.token !== token || !node?.style ||
         this.contentWindow.document !== node.ownerDocument || !node.isConnected) return;
     this.clearMarker();
-    const previous = {};
-    const applied = {};
-    for (const [name, value] of Object.entries({ "outline-width": "1px", "outline-style": "dotted", "outline-color": "currentColor", "outline-offset": "2px" })) {
-      previous[name] = [node.style.getPropertyValue(name), node.style.getPropertyPriority(name)];
-      node.style.setProperty(name, value, "important");
-      applied[name] = node.style.getPropertyValue(name);
-    }
-    this.marker = { node, token, previous, applied };
+    this.marker = { node, token, renderer: new LinkMarker(node, route.marker) };
   }
 
   receiveMessage({ name, data }) {
     if (name === "LinkedTabs:State") {
       this.markerState = data;
       if (!data?.markLastLink || data.token !== this.marker?.token) this.clearMarker();
+      else if (this.marker) this.marker.renderer.update(data.marker);
     } else if (name === "LinkedTabs:MarkContextLink") {
       const last = this.contextLink;
       if (last?.href === data.href && last.node.ownerDocument === this.contentWindow.document) {

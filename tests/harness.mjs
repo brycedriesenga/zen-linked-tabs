@@ -8,11 +8,20 @@ export async function harness(options = {}) {
   const registered = new Map();
   const prefs = new Map();
   const prefObservers = new Set();
+  const typedPref = (key, fallback, type) => {
+    const value = prefs.has(key) ? prefs.get(key) : fallback;
+    if (typeof value !== type) throw new TypeError("Wrong preference type");
+    return value;
+  };
   let serial = 0;
   const Services = {
     appinfo: { OS: options.OS || "Darwin" },
     prefs: {
-      getBoolPref: (key, fallback) => prefs.has(key) ? prefs.get(key) : fallback,
+      getBoolPref: (key, fallback) => typedPref(key, fallback, "boolean"),
+      getIntPref: (key, fallback) => typedPref(key, fallback, "number"),
+      getStringPref: (key, fallback) => typedPref(key, fallback, "string"),
+      setIntPref(key, value) { this.setBoolPref(key, value); },
+      setStringPref(key, value) { this.setBoolPref(key, value); },
       setBoolPref(key, value) {
         prefs.set(key, value);
         for (const [branch, observer] of prefObservers) if (key.startsWith(branch)) observer.observe(null, "nsPref:changed", key);
@@ -214,8 +223,14 @@ export function browserWindow(firstId = 1, options = {}) {
 
 export function click(overrides = {}) {
   const attrs = overrides.attrs || {};
+  const win = new EventTarget();
+  win.AbortController = AbortController;
+  win.requestAnimationFrame = () => 1;
+  win.cancelAnimationFrame = () => {};
+  win.MutationObserver = class { observe() {} disconnect() { this.disconnected = true; } };
   const doc = {
     URL: "https://example.com/search", nodePrincipal: { origin: "https://example.com" },
+    defaultView: win, documentElement: new Node(),
     policyContainer: { csp: "source-policy" }, querySelector: () => null
   };
   return {

@@ -1,13 +1,13 @@
-# Linked Tabs for Zen — v0.6.0 prototype
+# Linked Tabs for Zen — v0.7.0 prototype
 
 Keep a list, search result, or overview open in one split pane. Click its links to load them in the other pane, using Zen’s existing split tabs.
 
-**Status:** 52 passing automated tests against mocked browser APIs. Split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. The user confirmed core routing works in v0.3. v0.6 adds one-action linked splits, page-specific tooltips, explicit focus behavior, a keep-page action, configurable source-click modifiers, and an optional last-opened-link marker. These new workflows and visuals have **not been verified in a live Zen session** yet.
+**Status:** 70 passing automated tests against mocked browser APIs. Split integration was checked against Zen **1.23.3b** source and Sine **2.3.3** source. The user confirmed core routing works in v0.3. v0.7 adds a default arrow badge, four alternative marker styles, title targeting, wrapped-line geometry, live appearance settings, and an interactive preview. Marker geometry and generated SVG are tested with explicit DOM/layout fixtures; the tests are **not native-browser visual verification**. Live preview validation was blocked by browser access and URL restrictions in the development environment. These latest visuals still need checking in Zen.
 
 ## Update an existing Sine installation
 
 1. Open Zen Settings → Sine Mods (`about:preferences#sineMods`).
-2. Check for mod updates and update **Linked Tabs** to **0.6.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
+2. Check for mod updates and update **Linked Tabs** to **0.7.0**. If your Sine version does not fetch it, uninstall just Linked Tabs and install `brycedriesenga/zen-linked-tabs` again.
 3. Confirm Sine’s **Enable installing JS from unofficial sources** setting is on and the individual Linked Tabs toggle is enabled.
 4. Fully quit and reopen Zen. If the version still appears stale, use `about:support` → **Clear startup cache…**.
 5. In an existing two-tab split, hover at the top center of either pane. Look for the **Linked Tabs** icon **between the drag handle and unsplit button**.
@@ -29,7 +29,7 @@ This repository is a Sine JavaScript mod, not an XPI. Source ZIPs cannot be inst
 - **Choose focus:** by default, opening a source link explicitly keeps focus in the source. Enable **Focus the destination after opening links** to move focus to the result instead. A delayed navigation does not pull focus from an unrelated tab.
 - **Keep a result:** right-click the destination's chain button (or its sidebar tab), then choose **Keep this page as a separate tab**. A normal background tab opens the current URL in the same container and private window. The destination remains linked for the next result. This saves the URL, not form state, page history, or scroll position.
 - **Open a link in the source once:** hold **Option+Shift on macOS / Alt+Shift on Windows and Linux** while left-clicking an eligible source link. This also overrides `target="_blank"`, opening it in this same source pane. The pair stays linked. Alternatively, right-click the link and choose **Open link in this pane**.
-- **Mark the last opened link:** enable the optional marker to draw a subtle dotted outline around the last source link whose destination navigation was accepted. It does not change page layout. The marker moves to the next successfully routed link, restores existing inline outline styles, and clears on unlink, direction changes, leaving the split, page navigation, disabling the setting, or mod unload. It marks the last link opened; it does not track later navigation within the destination or guarantee the result finished loading.
+- **Mark the last opened link:** enable the optional marker to show an arrow badge beside the last source link whose destination navigation was accepted. Choose badge, underline, soft highlight, underline + highlight, or outline. Markers target visible titles and follow wrapped text without editing the page’s link styles or layout. The marker moves to the next successfully routed link and clears on unlink, direction changes, leaving the split, page navigation, disabling the setting, or mod unload. It marks the last link opened; it does not track later destination navigation or guarantee the result finished loading.
 
 Open **Zen Settings → Sine Mods → Linked Tabs → Settings** (the mod's configure button) to change these options. They apply to existing pairs without restarting Zen. Restart is still necessary after updating the mod's code.
 
@@ -38,6 +38,33 @@ The source-click modifier is configured using four independent checkboxes: **Alt
 Both focus-destination and last-link-marker settings default to **off**. The source-click default is **Alt/Option + Shift** even before opening Sine's settings dialog. Preferences are stored under `zen-linked-tabs.*`; pairing state and page titles/URLs are not saved by the mod.
 
 One-action split creation is disabled for larger splits, incompatible containers, or a pinned/essential/live-folder source that Zen would clone. Existing compatible two-pane pairs retain their normal controls. It leaves Zen's native split-link action available.
+
+## Marker appearance (v0.7)
+
+The marker toggle remains **off by default**. Existing users who enabled it get the new **badge** style after updating. Appearance controls live in **Sine Mods → Linked Tabs → Settings** and update the current marker immediately.
+
+| Setting | Options / behavior |
+| --- | --- |
+| Style | Badge (default), Underline, Soft highlight, Underline + highlight, Outline |
+| Color | Browser accent (default), link text color, or custom `#RGB` / `#RRGGBB` |
+| Emphasis | Subtle, Normal, Strong; presets control line thickness and highlight opacity |
+| Badge icon | Arrow (default), Dot, Split panes |
+| Badge size | 12, 14 (default), 16, 18 CSS pixels |
+| Badge placement | Automatic (default), Before first line, After first line, Above leading corner |
+| Advanced: thickness | Automatic from emphasis, or 1–5px |
+| Advanced: underline offset | 0–8px; increases the distance below the text baseline approximation |
+| Advanced: highlight opacity | Automatic from emphasis, or 10–60% |
+| Advanced: outline line | Solid (default), dotted, dashed |
+
+Normal emphasis uses a 2px stroke and 17% tint; subtle uses 1px / 10%, strong uses 3px / 26%. Badge backgrounds remain opaque, with automatic light/dark icon contrast. Invalid custom colors fall back to `#6366f1`.
+
+**Preview:** right-click a pane's chain button → **Preview marker appearance…**. This opens an internal preview tab with the current appearance choices and several clickable examples: a search-result heading with metadata, a community-post card, a wrapped inline link, and a scroll container. Choose a style or click another sample to move the marker. Preview controls do not change saved preferences; apply the choices you like in Sine's settings. No web service or network request is required for the preview.
+
+The preview can also be served locally for development: run `python3 -m http.server 8765 --bind 127.0.0.1` in the repository and open `http://127.0.0.1:8765/marker-preview.html`.
+
+**Placement:** the renderer prefers a visible heading within the clicked link. For empty full-card links, it looks for a title in the enclosing semantic post card and rejects headings belonging to a different URL. Text styles paint each visible line independently. A badge is placed against the **first line**, not the center of the entire link/card. Before/after follow text direction, including RTL. Automatic placement tries before, after, then above the leading corner, avoiding text, nearby controls, the viewport edge, and scroll-container clips. If no candidate fits, it hides the badge instead of covering text; an explicit placement does not silently switch positions.
+
+Soft highlights use the browser’s text-highlight API to paint behind glyphs when available, with a translucent per-line SVG fallback. Native highlights add one named range and one removable stylesheet, preserving existing stylesheets and highlights. The badge, underline, and outline overlay is isolated in a closed shadow tree, is non-interactive and hidden from assistive technology, and does not change fonts, text color, page spacing, inline styles, or keyboard focus. Scrolling, resizing, content changes, and font loading refresh its position. Removing the source link removes its overlay and listeners. CSS animations, transformed root elements, unusual shadow-DOM links, vertical writing, and arbitrary site-specific card layouts still need real-site verification; title detection is a bounded heuristic, not a site integration guarantee.
 
 ## Use
 
@@ -79,7 +106,8 @@ Test the v0.6 workflows in a normal two-pane split first:
 - Use the destination's **Keep this page as a separate tab** action; confirm a background tab opens outside the split and another source click still reuses the original destination.
 - Try Option+Shift/Alt+Shift-click on normal and `_blank` source links. Confirm both open in the source once without unlinking. Change the modifier checkboxes, check exact matching, then uncheck all to disable.
 - Try **Open link in this pane** from the source link context menu while the other pane is selected.
-- Turn the marker on, open two source links, and check that only the latest is outlined. Turn it off, unlink, change direction, and navigate away/back to confirm cleanup. Existing source outlines should return.
+- Turn the marker on, open two source links, and check that only the latest is marked. Try all five styles, RTL text, light/dark pages, a wrapped title, and a scroll container. Change color, size, position, and emphasis while the marker is visible; it should update immediately. Turn it off, unlink, change direction, and navigate away/back to check cleanup. Existing page styles should remain unchanged.
+- Open **Preview marker appearance…** and try its controls, all sample links, and its scrolling panel. Confirm preview changes do not modify Sine preferences.
 - Check native modifier/Glance behavior outside linked source panes, keyboard menu access and focus ring, normal/private windows, and container identity.
 
 For the deterministic routing fixture, open a terminal in this project folder and run:
@@ -111,11 +139,11 @@ Requires Node 20 or later. No `npm install` is needed.
 npm test
 ```
 
-Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. v0.3 tests cover current Gecko window properties without `ownerGlobal`, native-window fallback, asynchronous IPC errors, navigation exceptions, stale-document fallback suppression, and both SVG states. Later UI tests cover primary-button toggling, context and keyboard menu access, nested command handling, divider direction and sidebar reordering, no address-bar widget, and hiding/restoring controls when split size changes. v0.6 tests cover new/reused splits, captured context browsers, stale menu rejection, popup-hidden-before-command timing, container/private boundaries, focus choices, background keep-page behavior, modifier customization and disabling, source exceptions, marker acknowledgment order and cleanup, and Sine preference defaults. These tests do not establish that Gecko loads the actors or renders native menus correctly.
+Tests execute the actual entry point, policy, controller, runtime, and actor modules with mocked Gecko services and DOM. They cover routing, source-principal propagation, ignored clicks, direction reversal, stale-document handling, unlink races, container/private-state boundaries, invalid splits, multiple windows, unload, and Sine entry points. UI regressions cover per-pane actions when another pane is selected, late/recreated headers, no global toolbar, startup retries, unload cancellation, and visible actor-failure diagnostics. v0.3 tests cover current Gecko window properties without `ownerGlobal`, native-window fallback, asynchronous IPC errors, navigation exceptions, stale-document fallback suppression, and both SVG states. Later UI tests cover primary-button toggling, context and keyboard menu access, nested command handling, divider direction and sidebar reordering, no address-bar widget, and hiding/restoring controls when split size changes. v0.6 tests cover new/reused splits, captured context browsers, stale menu rejection, popup-hidden-before-command timing, container/private boundaries, focus choices, background keep-page behavior, modifier customization and disabling, source exceptions, marker acknowledgment order and cleanup, and Sine preference defaults. v0.7 adds option validation, line-fragment merging, first-line/RTL placement, crowded and clipped badge handling, semantic title selection, generated SVG for all styles/icons, live restyling, and overlay/observer cleanup. These tests use explicit fixture rectangles, not a browser layout engine, and do not establish native marker appearance or that Gecko loads actors and renders menus correctly.
 
 ## Troubleshooting / remove
 
-- **No hover-panel button:** make sure the split has exactly two panes, check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.6.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console. No address-bar button is expected in this version.
+- **No hover-panel button:** make sure the split has exactly two panes, check custom JavaScript is enabled in Sine, confirm the installed mod is version 0.7.0, and fully restart Zen. Open the Browser Console and look for `[Linked Tabs]` messages. Use **Browser Console**, not the website’s developer console. No address-bar button is expected in this version.
 - **Button appears but Link is disabled:** create an active split of exactly two tabs in the same container.
 - **Button appears but links do nothing:** test the fixture’s normal link first, then check the Browser Console. A JS-only navigation button or iframe link is intentionally outside this version’s scope.
 - **After updating:** fully quit and reopen Zen; imported privileged modules can remain cached until restart.
@@ -147,7 +175,9 @@ The original v0.2 test browser mock exposed the obsolete `ownerGlobal` property,
 - `linked-tabs.uc.js`: Sine startup and teardown.
 - `modules/Controller.sys.mjs`: pane controls, divider state, context menus, shortcut, preference observation, pairing, and actor marker cleanup.
 - `modules/Actions.sys.mjs`: captured menu context, native split creation/reuse, focus, source exception, and background keep-page actions.
-- `modules/Settings.sys.mjs` and `preferences.json`: runtime fallbacks and Sine settings.
+- `modules/Settings.sys.mjs` and `preferences.json`: typed runtime fallbacks and Sine settings.
+- `modules/Marker.sys.mjs`: title targeting, text geometry, collision-aware badge placement, isolated SVG rendering and cleanup.
+- `marker-preview.html` and `marker-preview.mjs`: local appearance playground using the same renderer as the content actor.
 - `modules/Runtime.sys.mjs`: process-wide actor registration and active source routes.
 - `actors/LinkedTabsChild.sys.mjs`: privileged capture of eligible source link clicks.
 - `actors/LinkedTabsParent.sys.mjs`: principal-checked navigation into the paired browser.
