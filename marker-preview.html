@@ -35,6 +35,13 @@
   .narrow { max-width: 300px; font-size: 18px; line-height: 1.6; }
   .scroll { max-height: 130px; overflow: auto; padding: 10px 28px; border: 1px solid light-dark(#e1e3ec,#444652); border-radius: 8px; }
   .scroll p { margin: 0 0 18px; }
+  .thing { padding-inline-start: 24px; }
+  .thing .entry, .thing .title { overflow: hidden; }
+  .thing .entry { margin-inline-start: 3px; }
+  .thing p.title { margin: 0 0 6px; font-size: 18px; line-height: 1.4; }
+  .thing .flair { font-size: 11px; padding: 2px 5px; border-radius: 3px; background: light-dark(#eee,#40434c); white-space: nowrap; }
+  .thing .meta { margin: 0 0 6px; }
+  .thing .comments { font-size: 12px; font-weight: 650; }
   #status { min-height: 24px; margin: 0; opacity: .8; }
   .hint { font-size: 12px; opacity: .7; margin: 0; }
   @media(max-width:720px) { body { padding: 24px 18px; } main { grid-template-columns: 1fr; gap: 20px; } .controls { grid-template-columns: repeat(2,minmax(0,1fr)); padding: 18px; } .controls details { grid-column: 1/-1; } .sample { padding: 24px; } }
@@ -63,6 +70,17 @@
         <h3 data-testid="post-title">What small changes have made browsing long discussions and finding useful replies easier for you?</h3>
         <p class="description">A wrapped title with a separate clickable layer and neighboring controls.</p>
       </article>
+    </section>
+    <section class="sample">
+      <p class="eyebrow">Classic community feed · inline title with layout clips</p>
+      <div class="thing">
+        <div class="entry">
+          <p class="title"><a class="title" href="#classic-title" id="classic-title-link">A classic post title that can wrap onto another line</a> <span class="flair">Discussion</span></p>
+          <p class="meta">Submitted 2 hours ago by example-user</p>
+          <a class="comments" href="#classic-comments" id="classic-comments-link">26 comments</a>
+        </div>
+      </div>
+      <p class="description">Try both the title and comments. Badges can use the free post gutter; text styles follow the title lines.</p>
     </section>
     <section class="sample">
       <p class="eyebrow">Inline link · multiple lines</p>

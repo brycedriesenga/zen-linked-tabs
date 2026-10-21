@@ -1,6 +1,6 @@
 {
   "name": "zen-linked-tabs",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "type": "module",
   "scripts": { "test": "node --experimental-vm-modules --test tests/*.test.mjs" }

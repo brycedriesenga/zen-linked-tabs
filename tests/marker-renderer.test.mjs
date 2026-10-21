@@ -1,8 +1,54 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { LinkMarker, markerTarget } from "../modules/Marker.sys.mjs";
-import { markerDOM, rectangle } from "./marker-dom.mjs";
+import { markerDOM, classicPostDOM, rectangle } from "./marker-dom.mjs";
 import { Style } from "./harness.mjs";
+
+for (const style of ["badge", "underline", "highlight", "combined", "outline"]) {
+  test(`${style} marks an inline classic Reddit title with zero client dimensions`, () => {
+    const h = classicPostDOM();
+    const marker = new LinkMarker(h.link, { style }); marker.render();
+    assert.ok(marker.group, "visible inline text must not produce empty clipping bounds");
+    const shape = marker.group.querySelector(style === "badge" ? "circle" : style === "underline" ? "line" : "rect");
+    assert.ok(shape);
+    if (style === "badge") assert.equal(shape.getAttribute("cx"), "88", "badge uses free post gutter beside the title");
+    else assert.equal(marker.group.getAttribute("x"), "100", "text styles retain block title clipping");
+    assert.equal(h.link.style.values.size, 0);
+    marker.destroy();
+  });
+}
+
+test("post gutter badges still respect scrolling wrappers and outer post clips", () => {
+  const h = classicPostDOM();
+  const marker = new LinkMarker(h.link, { position: "before" }); marker.render();
+  assert.ok(marker.group.querySelector("circle"));
+  h.entry.computed = { overflowX: "auto", overflowY: "auto" }; marker.render();
+  assert.equal(marker.group.querySelector("circle"), null);
+  h.entry.computed = { overflowX: "hidden", overflowY: "hidden" };
+  h.card.computed = { overflowX: "clip" }; h.card.rect = rectangle(95, 90, 655, 140); h.card.clientWidth = 655;
+  marker.render(); assert.equal(marker.group.querySelector("circle"), null);
+  marker.destroy();
+});
+
+test("badges do not escape the post gutter to mark text hidden by a title clip", () => {
+  const h = classicPostDOM();
+  h.link.children[0].rects = [rectangle(100, 60, 250, 22)];
+  const marker = new LinkMarker(h.link); marker.render();
+  assert.equal(marker.svg.querySelector("circle"), null);
+  marker.destroy();
+});
+
+test("inline-block overflow still clips text while display:contents has no clipping box", () => {
+  const h = classicPostDOM();
+  h.link.computed.display = "inline-block";
+  const marker = new LinkMarker(h.link, { style: "underline" }); marker.render();
+  assert.equal(marker.svg.querySelector("line"), null);
+  h.link.computed.display = "inline";
+  h.entry.computed.display = "contents"; h.entry.clientWidth = h.entry.clientHeight = 0;
+  marker.render();
+  assert.equal(marker.group.querySelectorAll("line").length, 2);
+  marker.destroy();
+});
 
 test("renderer anchors a badge to the heading rather than the larger search-result link", () => {
   const h = markerDOM();
@@ -48,7 +94,7 @@ test("the badge clears when its title scrolls out of an ancestor clip", () => {
   assert.ok(marker.group.querySelector("circle"));
   h.link.children[0].children[0].rects = [rectangle(100, 50, 250, 22), rectangle(100, 76, 160, 22)];
   marker.render();
-  assert.equal(marker.group.querySelector("circle"), null);
+  assert.equal(marker.svg.querySelector("circle"), null);
   marker.destroy();
 });
 
@@ -73,7 +119,7 @@ test("renderer cleanup removes overlay, observers, and queued frames on removal 
 });
 
 test("native text highlighting paints ranges behind glyphs and preserves other adopted stylesheets", () => {
-  const h = markerDOM(); const siteSheet = {};
+  const h = classicPostDOM(); const siteSheet = {};
   h.doc.adoptedStyleSheets = [siteSheet];
   h.win.CSS.highlights = new Map();
   h.win.Highlight = class { constructor(...ranges) { this.ranges = ranges; } };

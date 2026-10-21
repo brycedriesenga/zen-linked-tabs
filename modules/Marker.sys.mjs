@@ -69,6 +69,7 @@ function visible(element, win) {
 }
 
 const TITLE = 'h1,h2,h3,h4,h5,h6,[role="heading"],[slot="title"],[data-testid="post-title"]';
+const POST = 'article,[role="article"],shreddit-post,.thing';
 
 export function markerTarget(link) {
   const doc = link.ownerDocument, win = doc.defaultView;
@@ -77,7 +78,7 @@ export function markerTarget(link) {
   if (link.textContent.trim()) return link;
   // Some community feeds put an empty, full-card link above a separate title.
   // Only search a bounded semantic post card, and reject another link's title.
-  const card = link.closest('article,[role="article"],shreddit-post,.thing');
+  const card = link.closest(POST);
   if (card) {
     const title = Array.from(card.querySelectorAll(TITLE)).find(node => {
       const otherLink = node.closest("a[href]");
@@ -105,16 +106,28 @@ function textGeometry(target) {
   return { lines: mergeLineRects(rects), ranges };
 }
 
-function clippedBounds(target) {
+function clippedBounds(target, badge = false) {
   const doc = target.ownerDocument, win = doc.defaultView;
   const bounds = { left: 0, top: 0, right: doc.documentElement.clientWidth, bottom: win.innerHeight };
+  const card = badge ? target.closest(POST) : null;
+  let insideCard = !!card && target !== card;
   for (let node = target; node && node !== doc.documentElement; node = node.parentElement || node.getRootNode()?.host) {
+    if (node === card) insideCard = false;
     const style = win.getComputedStyle(node), rect = node.getBoundingClientRect();
+    // Overflow does not create a clip on non-replaced inline boxes. In
+    // particular, a visible inline a.title on classic Reddit has zero client
+    // dimensions even though its text Range has valid rectangles.
+    if (style.display === "contents" || (style.display === "inline" && !node.matches("img,video,audio,canvas,iframe,embed,object,input,textarea,select"))) continue;
     const left = rect.left + node.clientLeft, top = rect.top + node.clientTop;
-    if (/(hidden|clip|auto|scroll)/.test(style.overflowX)) {
+    // A badge may use the free gutter inside a semantic post, beyond its
+    // title/entry layout clips. Scroll containers and the post's own/outer
+    // boundaries still apply. Text styles always keep every real clip.
+    const gutter = badge && (insideCard || (node === target && node !== card));
+    const clips = value => /^(auto|scroll)$/.test(value) || (!gutter && /^(hidden|clip)$/.test(value));
+    if (clips(style.overflowX)) {
       bounds.left = Math.max(bounds.left, left); bounds.right = Math.min(bounds.right, left + node.clientWidth);
     }
-    if (/(hidden|clip|auto|scroll)/.test(style.overflowY)) {
+    if (clips(style.overflowY)) {
       bounds.top = Math.max(bounds.top, top); bounds.bottom = Math.min(bounds.bottom, top + node.clientHeight);
     }
   }
@@ -258,9 +271,15 @@ export class LinkMarker {
     if (!lines.length && visible(target, this.win)) lines.push(box(target.getBoundingClientRect()));
     if (!this.host) this.createOverlay();
     this.svg.replaceChildren();
+    this.group = null;
     this.svg.setAttribute("viewBox", `0 0 ${this.doc.documentElement.clientWidth} ${this.win.innerHeight}`);
-    const bounds = clippedBounds(optionsForBounds(this.options, target));
-    if (!lines.length || bounds.right <= bounds.left || bounds.bottom <= bounds.top || !visible(target, this.win)) { this.clearHighlight(); return; }
+    const textBounds = clippedBounds(target);
+    const isBadge = this.options.style === "badge";
+    const bounds = isBadge ? clippedBounds(target, true) : textBounds;
+    // Relaxing a title's layout clip for the badge must not mark text that
+    // is itself hidden. A badge follows the first line, including on scroll.
+    const hasVisibleText = (isBadge ? lines.slice(0, 1) : lines).some(line => overlaps(line, textBounds));
+    if (!hasVisibleText || bounds.right <= bounds.left || bounds.bottom <= bounds.top || !visible(target, this.win)) { this.clearHighlight(); return; }
     // A nested SVG viewport clips without fragment URL references, which can
     // resolve differently on pages with a <base> URL or inside a shadow tree.
     this.group = this.svgElement("svg", {
@@ -302,10 +321,4 @@ export class LinkMarker {
     if (this.frame) this.win.cancelAnimationFrame(this.frame);
     this.host?.remove();
   }
-}
-
-function optionsForBounds(options, target) {
-  // A title's own ellipsis/line-clamp box clips text styles, but should not
-  // prevent a badge from sitting beside it. Ancestor scroll clips still apply.
-  return options.style === "badge" ? target.parentElement || target : target;
 }

@@ -33,6 +33,7 @@ export function markerDOM() {
     matches(selector) {
       return selector.split(",").some(part => {
         if (part.trim() === this.tagName) return true;
+        if (part.trim().startsWith(".")) return (this.getAttribute("class") || "").split(/\s+/).includes(part.trim().slice(1));
         const attr = part.trim().match(/^(\w+)?\[([^=\]]+)(?:="([^"]*)")?\]$/);
         const has = attr && (attr[2] === "href" ? !!this.href : this.hasAttribute(attr[2]));
         return attr && (!attr[1] || attr[1] === this.tagName) && has && (attr[3] === undefined || this.getAttribute(attr[2]) === attr[3]);
@@ -66,6 +67,24 @@ export function markerDOM() {
   };
   addText(heading, "A title that wraps", [rectangle(100, 120, 250, 22), rectangle(100, 146, 160, 22)]);
   return { doc, win, link, heading, Element, addText, frames };
+}
+
+// Classic Reddit applies overflow:hidden to both p.title and the inline
+// a.title. Inline text has Range rects even though its client dimensions are 0.
+export function classicPostDOM() {
+  const h = markerDOM();
+  const card = new h.Element("div"); card.setAttribute("class", "thing");
+  card.rect = rectangle(50, 90, 700, 140); card.clientWidth = 700; card.clientHeight = 140;
+  h.doc.documentElement.appendChild(card);
+  const entry = new h.Element("div"); entry.computed = { overflowX: "hidden", overflowY: "hidden" };
+  entry.rect = rectangle(100, 110, 600, 100); entry.clientWidth = 600; entry.clientHeight = 100; card.appendChild(entry);
+  const title = new h.Element("p"); title.setAttribute("class", "title"); title.computed = { ...entry.computed };
+  title.rect = rectangle(100, 120, 500, 50); title.clientWidth = 500; title.clientHeight = 50; entry.appendChild(title);
+  title.appendChild(h.link); h.link.removeChild(h.heading);
+  h.link.setAttribute("class", "title"); h.link.computed = { display: "inline", ...entry.computed };
+  h.link.rect = rectangle(100, 120, 250, 48); h.link.clientWidth = h.link.clientHeight = 0;
+  h.addText(h.link, "A classic community post title that wraps", [rectangle(100, 120, 250, 22), rectangle(100, 146, 160, 22)]);
+  return { ...h, card, entry, title };
 }
 
 export function rectangle(left, top, width, height) {
